@@ -3,8 +3,9 @@ import type { LutName } from "@sea/sprites/palette";
 import { lutHex, type BgName } from "../assets";
 import type { CastResult, FishingSession, GameBackend } from "../backend";
 import type { Engine, Scene } from "../engine";
+import type { Game } from "../game";
 import { pixelCurve, pixelLine } from "../render/pixels";
-import { gaugeH, gaugeV, panel, text, textWidth } from "../render/ui";
+import { button, dim, gaugeH, gaugeV, inRect, panel, text, textWidth } from "../render/ui";
 import { drawSurface } from "../render/water";
 import { Reel } from "../systems/reel";
 import { Clock } from "../systems/timeOfDay";
@@ -70,10 +71,13 @@ export class FishingScene implements Scene {
   // geometry from the last render, used by update
   private tip: [number, number] = [380, 110];
   private feet: [number, number] = [344, 146];
+  /** ESC menu (design §7-3): the world stops while it is open. */
+  pause: { sel: number } | null = null;
 
   constructor(
     public spot: Spot,
     private readonly backend: GameBackend,
+    private readonly game?: Game,
   ) {}
 
   get point(): FishingPoint {
@@ -86,9 +90,9 @@ export class FishingScene implements Scene {
     void this.open();
   }
 
-  exit(): void {
-    if (this.session) this.backend.closeSession(this.session.sessionId);
-  }
+  /** Leaving the scene (to the lobby, a reload) keeps the session open: coming back resumes the
+   *  same seed and cast index (design §11-4). Sailing away from the point closes it (moveTo). */
+  exit(): void {}
 
   private async open(): Promise<void> {
     this.state = { k: "loading" };
@@ -145,6 +149,7 @@ export class FishingScene implements Scene {
   // ── update ─────────────────────────────────────────────────────────────────────
 
   update(dt: number, engine: Engine): void {
+    if (this.updatePause(engine)) return;
     this.t += dt;
     this.clock.update(dt);
     const input = engine.input;
@@ -220,6 +225,39 @@ export class FishingScene implements Scene {
         if (s.t > 1.4 || (s.t > 0.35 && input.pressed)) this.state = { k: "idle", t: 0 };
         return;
     }
+  }
+
+  private pauseItems() {
+    const x = 320 - 70, w = 140;
+    return [
+      { id: "resume", label: "계속하기", rect: { x, y: 156, w, h: 20 } },
+      { id: "title", label: "로비로 나가기", rect: { x, y: 182, w, h: 20 } },
+    ];
+  }
+
+  /** Handles the ESC menu; true while it is open (the world doesn't step). Mid-fight is not a
+   *  pause point — the line would go slack. */
+  private updatePause(engine: Engine): boolean {
+    const input = engine.input;
+    const calm = ["loading", "idle", "caught", "lost"].includes(this.state.k);
+    if (!this.pause) {
+      if (input.hit("Escape") && calm && this.game) this.pause = { sel: 0 };
+      return !!this.pause;
+    }
+    const items = this.pauseItems();
+    if (input.hit("Escape")) {
+      this.pause = null;
+      return true;
+    }
+    const d = input.hit("ArrowDown") + input.hit("KeyS") - input.hit("ArrowUp") - input.hit("KeyW");
+    if (d) this.pause.sel = (this.pause.sel + d + items.length * 4) % items.length;
+    const hover = items.findIndex((it) => inRect(input.pointer, it.rect));
+    if (hover >= 0 && input.clicked) this.pause.sel = hover;
+    const go = input.clicked ? hover : input.pressed ? this.pause.sel : -1;
+    const id = items[go]?.id;
+    if (id === "resume") this.pause = null;
+    else if (id === "title") this.game!.toTitle();
+    return true;
   }
 
   /** Roll the cast from the session seed (design §11-3) and start the wait. */
@@ -489,6 +527,13 @@ export class FishingScene implements Scene {
       text(ctx, this.toast.text, 320, 79, { align: "center" });
     }
     if (s.k === "loading") text(ctx, "…", 320, 170, { align: "center" });
+
+    if (this.pause) {
+      dim(ctx, 0.5);
+      panel(ctx, assets, "panel_wood", 320 - 90, 120, 180, 96);
+      text(ctx, "일시정지", 320, 132, { align: "center", color: lutHex("bark1"), shadow: null, font: "bold 12px Galmuri11, monospace" });
+      this.pauseItems().forEach((it, i) => button(ctx, assets, i === this.pause!.sel ? "hover" : "normal", it.label, it.rect.x, it.rect.y, it.rect.w, it.rect.h));
+    } else if (s.k === "idle" && this.game) text(ctx, "ESC 메뉴", 634, 344, { align: "right", color: lutHex("foam2") });
 
     if (engine.dev) {
       const line = `${this.clock.label()} ${lut} · ${this.spot.kind === "dock" ? "선착장" : `배 위 (${this.spot.sea})`} · ${s.k} · ${engine.fps}fps  [T]+1h [B]장소 [N]바다`;

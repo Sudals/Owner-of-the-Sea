@@ -17,8 +17,10 @@ export function GameCanvas() {
         await loadFonts();
         // demo and full both use the local backend until RemoteBackend lands (M4)
         const backend = new LocalBackend();
-        const e = await createGame(host.current!, {
+        const { engine: e, game } = await createGame(host.current!, {
           backend,
+          mode: __BUILD_MODE__,
+          // no quit on the web: a tab can't close itself; Electron passes window.close via preload (M4)
           assetBase: `${import.meta.env.BASE_URL}assets/`,
           dev: import.meta.env.DEV,
           // a cancelled (StrictMode double-mount) load must not overwrite the live one's state
@@ -28,7 +30,7 @@ export function GameCanvas() {
         engine = e;
         setProgress("");
         // test hook for the Playwright smoke/screenshot script
-        (window as unknown as { __sea?: unknown }).__sea = { engine: e, backend, ready: true };
+        (window as unknown as { __sea?: unknown }).__sea = { engine: e, game, backend, ready: true };
       } catch (err) {
         console.error(err);
         setError(err instanceof Error ? err.message : String(err));

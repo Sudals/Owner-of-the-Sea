@@ -10,6 +10,10 @@ export class Input {
   released = false;
   /** Pointer position in view pixels (640×360 space), or null when unknown. */
   pointer: { x: number; y: number } | null = null;
+  /** Where the pointer went down since the previous step (menus hit-test this), or null. */
+  clicked: { x: number; y: number } | null = null;
+  /** Every pointer-down since the previous step, oldest first (fast double clicks on "+"). */
+  clicks: { x: number; y: number }[] = [];
 
   private raw = false;
   private presses = 0;
@@ -18,6 +22,8 @@ export class Input {
   private keyHits = new Map<string, number>();
   private keyHitsStep = new Map<string, number>();
   private padWasDown = false;
+  private padHeld = new Set<number>();
+  private pendingClicks: { x: number; y: number }[] = [];
   private readonly off: (() => void)[] = [];
 
   constructor(private readonly target: HTMLElement) {
@@ -29,6 +35,7 @@ export class Input {
       e.preventDefault();
       target.setPointerCapture?.(e.pointerId);
       this.track(e);
+      if (this.pointer) this.pendingClicks.push(this.pointer);
       this.setSource(`p${e.pointerId}`, true);
     });
     on(target, "pointermove", (e) => this.track(e));
@@ -36,10 +43,13 @@ export class Input {
     on(target, "pointercancel", (e) => this.setSource(`p${e.pointerId}`, false));
     on(target, "contextmenu", (e) => e.preventDefault());
     on(window, "keydown", (e) => {
+      // Enter that commits a Hangul IME composition is not a button press
+      if (e.isComposing || e.keyCode === 229) return;
+      if (!e.repeat || e.code.startsWith("Arrow")) this.keyHits.set(e.code, (this.keyHits.get(e.code) ?? 0) + 1);
       if (e.code === "Space" || e.code === "Enter") {
         e.preventDefault();
         if (!e.repeat) this.setSource(`k${e.code}`, true);
-      } else if (!e.repeat) this.keyHits.set(e.code, (this.keyHits.get(e.code) ?? 0) + 1);
+      }
     });
     on(window, "keyup", (e) => {
       if (e.code === "Space" || e.code === "Enter") this.setSource(`k${e.code}`, false);
@@ -60,9 +70,13 @@ export class Input {
     this.down = this.raw;
     this.keyHitsStep = this.keyHits;
     this.keyHits = new Map();
+    this.clicks = this.pendingClicks;
+    this.clicked = this.clicks[0] ?? null;
+    this.pendingClicks = [];
   }
 
-  /** How many times a non-action key (KeyboardEvent.code) went down since the previous step — dev shortcuts. */
+  /** How many times a key (KeyboardEvent.code) went down since the previous step — menus and dev
+   *  shortcuts. Arrow keys count auto-repeat; the gamepad d-pad and B arrive as Arrow keys / Escape. */
   hit(code: string): number {
     return this.keyHitsStep.get(code) ?? 0;
   }
@@ -90,8 +104,25 @@ export class Input {
   private pollGamepad(): void {
     const pads = navigator.getGamepads?.() ?? [];
     let isDown = false;
-    for (const p of pads) if (p?.buttons[0]?.pressed) isDown = true;
+    const held = new Set<number>();
+    for (const p of pads) {
+      if (!p) continue;
+      if (p.buttons[0]?.pressed) isDown = true;
+      for (const b of PAD_KEYS.keys()) if (p.buttons[b]?.pressed) held.add(b);
+    }
     if (isDown !== this.padWasDown) this.setSource("pad", isDown);
     this.padWasDown = isDown;
+    for (const b of held) if (!this.padHeld.has(b)) this.keyHits.set(PAD_KEYS.get(b)!, (this.keyHits.get(PAD_KEYS.get(b)!) ?? 0) + 1);
+    this.padHeld = held;
   }
 }
+
+/** Standard-mapping gamepad buttons → the keyboard codes menus already listen for. */
+const PAD_KEYS = new Map<number, string>([
+  [1, "Escape"], // B
+  [9, "Escape"], // Start
+  [12, "ArrowUp"],
+  [13, "ArrowDown"],
+  [14, "ArrowLeft"],
+  [15, "ArrowRight"],
+]);

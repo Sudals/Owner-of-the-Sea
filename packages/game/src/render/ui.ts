@@ -81,3 +81,39 @@ export function gaugeV(ctx: CanvasRenderingContext2D, x: number, y: number, h: n
   ctx.fillStyle = color;
   ctx.fillRect(x + 2, y + h - 2 - fill, 4, fill);
 }
+
+export type ButtonState = "normal" | "hover" | "pressed" | "disabled";
+
+/** Button from ui.png (40×14, 4px corners) 9-sliced to any size, with a centered label. */
+export function button(ctx: CanvasRenderingContext2D, assets: Assets, state: ButtonState, label: string, x: number, y: number, w: number, h = 20): void {
+  const name = `button_${state}`;
+  const f = assets.frame("ui", name);
+  const c = 4;
+  x = Math.round(x); y = Math.round(y); w = Math.round(w); h = Math.round(h);
+  const part = (sx: number, sy: number, sw: number, sh: number, dx: number, dy: number, dw: number, dh: number) =>
+    assets.drawPart(ctx, "ui", name, sx, sy, sw, sh, dx, dy, dw, dh);
+  const mw = f.w - 2 * c, mh = f.h - 2 * c, iw = w - 2 * c, ih = h - 2 * c;
+  part(c, c, mw, mh, x + c, y + c, iw, ih); // flat fill: stretching is fine
+  part(c, 0, mw, c, x + c, y, iw, c);
+  part(c, f.h - c, mw, c, x + c, y + h - c, iw, c);
+  part(0, c, c, mh, x, y + c, c, ih);
+  part(f.w - c, c, c, mh, x + w - c, y + c, c, ih);
+  part(0, 0, c, c, x, y, c, c);
+  part(f.w - c, 0, c, c, x + w - c, y, c, c);
+  part(0, f.h - c, c, c, x, y + h - c, c, c);
+  part(f.w - c, f.h - c, c, c, x + w - c, y + h - c, c, c);
+  const color = state === "disabled" ? lutHex("gray1") : lutHex("ink");
+  text(ctx, label, x + w / 2, y + Math.round((h - 12) / 2) + (state === "pressed" ? 1 : 0), { align: "center", color, shadow: null });
+}
+
+/** Darken the whole view (behind dialogs). */
+export function dim(ctx: CanvasRenderingContext2D, alpha = 0.55): void {
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = lutHex("ink");
+  ctx.fillRect(0, 0, 640, 360);
+  ctx.globalAlpha = 1;
+}
+
+/** Is view point p inside rect r? */
+export const inRect = (p: { x: number; y: number } | null, r: { x: number; y: number; w: number; h: number }): boolean =>
+  !!p && p.x >= r.x && p.x < r.x + r.w && p.y >= r.y && p.y < r.y + r.h;

@@ -19,8 +19,18 @@ const watch = (page) => {
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });
 watch(page);
 await page.goto(BASE);
+await page.evaluate(() => localStorage.removeItem("sea.local.v1"));
+await page.reload();
 await page.waitForFunction(() => window.__sea?.ready === true, null, { timeout: 30_000 });
 await page.waitForTimeout(800);
+await page.locator("canvas").screenshot({ path: `${OUT}/lobby.png` });
+// lobby (design §7-3): 새 게임 is focused on a first run → name → into the dock
+await page.keyboard.press("Enter");
+await page.waitForFunction(() => window.__sea.engine.currentScene.state.k === "name");
+await page.keyboard.insertText("화면확인");
+await page.keyboard.press("Enter");
+await page.waitForFunction(() => window.__sea.engine.currentScene.state.k === "idle", null, { timeout: 15_000 });
+await page.waitForTimeout(300);
 
 const canvas = page.locator("canvas");
 const box = await canvas.boundingBox();

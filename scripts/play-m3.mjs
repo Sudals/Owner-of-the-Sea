@@ -29,6 +29,7 @@ const scene = () =>
       seed: s.session?.seed ?? null,
       nextIndex: s.session?.nextIndex ?? null,
       hold: window.__sea.backend.hold().length,
+      title: !("session" in s),
     };
   });
 const waitFor = async (pred, timeout = 20_000) => {
@@ -81,10 +82,22 @@ async function fishOnce(n, { strike = true } = {}) {
   return { result: end.k === "caught" ? `caught ${end.fish} ${end.size}cm` : `lost (${end.reason}) ${end.fish ?? ""}`, secs: ((Date.now() - t0) / 1000).toFixed(1) };
 }
 
+// Through the lobby (design §7-3): 새 게임 is focused on a first run, 이어하기 once a save exists.
+const fromLobby = async (name) => {
+  await page.waitForFunction(() => window.__sea?.ready === true && window.__sea.engine.currentScene.state.k === "menu", null, { timeout: 30_000 });
+  await page.waitForTimeout(650); // fade-in
+  await page.keyboard.press("Enter");
+  if (name) {
+    await page.waitForFunction(() => window.__sea.engine.currentScene.state.k === "name");
+    await page.keyboard.insertText(name);
+    await page.keyboard.press("Enter");
+  }
+};
+
 await page.goto(BASE);
 await page.evaluate(() => localStorage.removeItem("sea.local.v1"));
 await page.reload();
-await page.waitForFunction(() => window.__sea?.ready === true, null, { timeout: 30_000 });
+await fromLobby("낚시시험");
 await waitFor((s) => s.k === "idle");
 
 const log = [];
@@ -96,7 +109,7 @@ console.log(`hold after 4 casts: ${before.hold} · session seed ${before.seed?.s
 
 // reload without leaving the point: same seed, same next cast index (design §11-4)
 await page.reload();
-await page.waitForFunction(() => window.__sea?.ready === true, null, { timeout: 30_000 });
+await fromLobby(null); // 이어하기
 const after = await waitFor((s) => s.k === "idle");
 const resumed = after.seed === before.seed && after.nextIndex === before.nextIndex;
 console.log(`after reload: seed ${after.seed?.slice(0, 8)}… next cast index ${after.nextIndex} hold ${after.hold} → ${resumed ? "RESUMED ✓" : "NOT RESUMED ✗"}`);

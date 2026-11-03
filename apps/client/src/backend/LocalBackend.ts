@@ -1,7 +1,8 @@
-import type { CastRecord, FishingSession, GameBackend, Gear, HoldItem } from "@sea/game";
+import type { CastRecord, FishingSession, GameBackend, Gear, HoldItem, Profile } from "@sea/game";
 import { newSeedHex } from "@sea/shared";
 
 // Demo-build backend (design §2, §7, §11-5): everything in localStorage, seeds made locally.
+// The player is just a name kept in this browser (design §5) — no server, no 이어하기 코드.
 // Session rules mirror the server (§11-3, §11-4):
 //   · leaving a point closes its session → a fresh seed next time
 //   · a session older than 2 h is replaced
@@ -13,13 +14,14 @@ const SESSION_TTL_MS = 2 * 60 * 60 * 1000;
 
 type StoredSession = FishingSession & { createdAt: number; closed: boolean };
 type Store = {
+  profile: Profile | null;
   sessions: Record<string, StoredSession>; // by spotId
   journal: { sessionId: string; cast: CastRecord }[];
   hold: HoldItem[];
   gear: Gear;
 };
 
-const fresh = (): Store => ({ sessions: {}, journal: [], hold: [], gear: { rodLv: 1, lineLv: 1 } });
+const fresh = (): Store => ({ profile: null, sessions: {}, journal: [], hold: [], gear: { rodLv: 1, lineLv: 1 } });
 
 export class LocalBackend implements GameBackend {
   private store: Store;
@@ -60,6 +62,30 @@ export class LocalBackend implements GameBackend {
 
   hold(): HoldItem[] {
     return this.store.hold;
+  }
+
+  profile(): Profile | null {
+    return this.store.profile;
+  }
+
+  /** 새 게임 wipes this browser's save and starts over under `name`. */
+  async startNew(name: string): Promise<Profile> {
+    const now = new Date().toISOString();
+    this.store = { ...fresh(), profile: { name, createdAt: now, lastPlayedAt: now } };
+    this.save();
+    return this.store.profile!;
+  }
+
+  async resume(): Promise<Profile> {
+    const p = this.store.profile;
+    if (!p) throw new Error("이 기기에 저장된 기록이 없어요.");
+    p.lastPlayedAt = new Date().toISOString();
+    this.save();
+    return p;
+  }
+
+  async forget(): Promise<void> {
+    this.reset();
   }
 
   /** Dev helper: wipe local progress. */

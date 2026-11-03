@@ -30,6 +30,15 @@ export type HoldItem = { fishId: string; sizeCm: number; spotId: string; caughtA
 
 export type Gear = { rodLv: number; lineLv: number };
 
+/** The player saved on this device (design §5: a name, no login until Steam). */
+export type Profile = {
+  name: string;
+  createdAt: string;
+  lastPlayedAt: string;
+  /** 이어하기 코드 for moving to another PC — only when the server issued one (full build). */
+  recoveryCode?: string | null;
+};
+
 export interface GameBackend {
   /** Open (or resume) the seed session for a fishing point. */
   openSession(spotId: string): Promise<FishingSession>;
@@ -40,4 +49,16 @@ export interface GameBackend {
   gear(): Gear;
   /** Unsold fish in the boat's hold (score is credited when sold — design v9 §4-4). */
   hold(): HoldItem[];
+
+  // ── profile (lobby, design §5 / §7-3) ──
+  /** This device's player, or null on a first run. */
+  profile(): Profile | null;
+  /** 새 게임: start over under `name` (already validated). Rejects with a player-facing message, e.g. the name is taken. */
+  startNew(name: string): Promise<Profile>;
+  /** 이어하기: mark the profile as played now; resolves once the save is ready to play. */
+  resume(): Promise<Profile>;
+  /** 이어하기 코드 → load this player's save from the server. Absent where saves are local only (demo). */
+  recover?(code: string): Promise<Profile>;
+  /** 설정 → 이 기기에서 기록 지우기. */
+  forget(): Promise<void>;
 }
