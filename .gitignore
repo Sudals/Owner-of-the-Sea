@@ -33,3 +33,7 @@ dist/
 
 # desktop installers
 apps/desktop/release/
+
+# release archives (installers are published as GitHub Release assets, not committed)
+apps/desktop/release.zip
+apps/desktop/*.zip

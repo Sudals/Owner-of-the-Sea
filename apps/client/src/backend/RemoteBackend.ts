@@ -61,15 +61,28 @@ const freshJournal = (): Journal => ({
   lastSavedAt: null,
 });
 
-/** Journals written before M5 lack the bait and market fields (and the tank/hold levels). */
+/** Journals written by older builds lack later fields: 0.1.0 (M4) had no trades, gold, 도감 or
+ *  inventory; M5 added bait, the market log and the tank/hold levels. Every missing field gets
+ *  its default so nothing reads `undefined` (0.2.0 crashed on `ops.length`). */
 function upgrade(j: Journal): Journal {
-  j.inventory ??= {};
+  const f = freshJournal() as Record<string, unknown>;
+  const r = j as unknown as Record<string, unknown>;
+  for (const k of Object.keys(f)) if (r[k] === undefined || r[k] === null) r[k] = f[k] ?? null;
+  for (const k of ["hold", "dex", "ops"] as const) if (!Array.isArray(j[k])) (j as Record<string, unknown>)[k] = [];
+  if (typeof j.gold !== "number") j.gold = j.base?.gold ?? 0;
   j.marketLog = normalizeLog(j.marketLog);
   for (const w of [j.world, j.base?.world]) if (w) Object.assign(w, { tankLv: w.tankLv ?? 1, holdLv: w.holdLv ?? 1 });
   if (j.base) {
-    j.base.inventory ??= {};
-    j.base.marketLog = normalizeLog(j.base.marketLog);
+    const b = j.base as Partial<NonNullable<Journal["base"]>> & { world: WorldState };
+    b.hold = Array.isArray(b.hold) ? b.hold : [];
+    b.gear ??= { rodLv: 1, lineLv: 1 };
+    b.gold = typeof b.gold === "number" ? b.gold : 0;
+    b.dex = Array.isArray(b.dex) ? b.dex : [];
+    b.inventory ??= {};
+    b.marketLog = normalizeLog(b.marketLog);
   }
+  for (const [k, v] of Object.entries(j.sessions)) if (!v) delete j.sessions[k];
+  for (const [k, v] of Object.entries(j.pending)) if (!Array.isArray(v)) delete j.pending[k];
   return j;
 }
 

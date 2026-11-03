@@ -38,6 +38,8 @@ export class Game {
     readonly mode: BuildMode,
     /** Closes the app (Electron). Null on the web — a tab can't close itself. */
     readonly quit: (() => void) | null,
+    /** "0.2.0" — the lobby shows it. */
+    readonly version = "",
   ) {}
 
   get world(): WorldState {

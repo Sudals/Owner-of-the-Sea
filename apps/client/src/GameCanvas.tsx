@@ -35,6 +35,7 @@ export function GameCanvas() {
         const { engine: e, game } = await createGame(host.current!, {
           backend,
           mode: __BUILD_MODE__,
+          version: __APP_VERSION__,
           // the web can't close its own tab; the desktop app can
           quit: app ? () => app.quit() : undefined,
           assetBase: `${import.meta.env.BASE_URL}assets/`,

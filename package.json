@@ -24,7 +24,8 @@
     "dist:win": "pnpm --filter @sea/desktop dist:win",
     "sim:economy": "tsx scripts/sim-economy.mts",
     "build:web": "node scripts/build-web.mjs",
-    "deploy:web": "node scripts/build-web.mjs && pnpm dlx wrangler@4.156.2 pages deploy apps/web/dist --project-name owner-of-the-sea --branch main"
+    "deploy:web": "node scripts/build-web.mjs && cd apps/web && pnpm dlx wrangler@4.156.2 pages deploy dist --project-name owner-of-the-sea --branch main",
+    "web:create": "cd apps/web && pnpm dlx wrangler@4.156.2 pages project create owner-of-the-sea --production-branch main --force"
   },
   "devDependencies": {
     "@types/pg": "^8.23.1",

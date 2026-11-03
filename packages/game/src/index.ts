@@ -23,6 +23,8 @@ export type GameOptions = {
   assetBase?: string;
   /** demo (web 체험판) or full (exe) — design §2. */
   mode?: BuildMode;
+  /** Shown in the lobby corner (the desktop app's version). */
+  version?: string;
   /** Closes the app; omit on the web (the lobby's 종료 then explains to close the tab). */
   quit?: () => void;
   /** Dev overlay + shortcuts (fishing: T +1h, B dock/boat, N next sea · sea: H hull, F fuel). */
@@ -34,7 +36,7 @@ export type GameOptions = {
 export async function createGame(host: HTMLElement, opts: GameOptions): Promise<{ engine: Engine; game: Game }> {
   const assets = await Assets.load(opts.assetBase ?? "/assets/", opts.onProgress);
   const engine = new Engine(host, { assets, dev: opts.dev });
-  const game = new Game(engine, opts.backend, opts.mode ?? "full", opts.quit ?? null);
+  const game = new Game(engine, opts.backend, opts.mode ?? "full", opts.quit ?? null, opts.version ?? "");
   game.toTitle();
   engine.start();
   return { engine, game };

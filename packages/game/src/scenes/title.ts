@@ -450,7 +450,8 @@ export class TitleScene implements Scene {
     }
 
     // build / hint lines
-    text(ctx, this.game.mode === "demo" ? "체험판 v0.1" : "v0.1", 6, 344, { color: lutHex("foam2") });
+    const v = this.game.version ? `v${this.game.version}` : "";
+    text(ctx, this.game.mode === "demo" ? `체험판 ${v}` : v, 6, 344, { color: lutHex("foam2") });
     if (s.k === "menu") text(ctx, "↑↓ 고르기 · Enter 결정", 634, 344, { align: "right", color: lutHex("foam2") });
 
     const fade = s.k === "starting" ? Math.min(1, s.t / 0.4) : this.fadeIn / 0.6;
