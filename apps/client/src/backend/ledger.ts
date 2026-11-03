@@ -8,6 +8,7 @@ export type Tradeable = { gold: number; hold: HoldItem[]; inventory: Inventory; 
 /** Apply a trade to live state in place (Economy.md §8-1: the same code the server replays). */
 export function tradeOn(s: Tradeable, op: ShopOp): OpResult {
   const now = op.t;
+  op.clock ??= s.world.seaTime; // journaled with the op: the server prices freshness at this moment
   const l: Ledger = {
     gold: s.gold,
     hold: s.hold,
@@ -20,7 +21,7 @@ export function tradeOn(s: Tradeable, op: ShopOp): OpResult {
     tankLv: s.world.tankLv,
     iceLv: s.world.iceLv,
     holdLv: s.world.holdLv,
-    clock: s.world.seaTime,
+    clock: op.clock,
     date: kstDate(now),
     now,
     log: structuredClone(s.log),

@@ -86,6 +86,12 @@ export class SeaScene implements Scene {
   }
 
   exit(): void {
+    // docked or towed in: the world already says "at the island" — keep it, save just the chart
+    if (this.game.world.at.kind !== "sea") {
+      this.game.world.chart = this.explored.toString();
+      this.game.save();
+      return;
+    }
     this.persist();
   }
 
@@ -147,7 +153,8 @@ export class SeaScene implements Scene {
     if (this.pause) return this.updatePause(engine);
     if (input.hit("Escape")) return void (this.pause = { sel: 0 });
     if (input.hit("KeyM")) return this.openChart();
-    if (input.hit("KeyI")) return void (this.bag = new InventoryPanel(this.game));
+    if (input.hit("KeyI")) return void (this.bag = this.openBag());
+    if (input.hit("KeyR")) this.useRepairKit();
 
     this.game.tick(dt, true);
     if (this.toast && this.t > this.toast.until) this.toast = null;
@@ -430,6 +437,31 @@ export class SeaScene implements Scene {
 
   /** Hull at 0: towed to the nearest open village, losing part of the hold (Economy.md §4-6).
    *  The fee is paid there on arrival (the tow trade). */
+  private openBag(): InventoryPanel {
+    return new InventoryPanel(this.game, (item, r) => item === "repair_kit" && r.ok && this.repairFx(r.message));
+  }
+
+  /** R: patch the hull with a 수리 키트 right here (Economy.md §4-6). */
+  private useRepairKit(): void {
+    const w = this.game.world;
+    if ((this.game.backend.inventory().repair_kit ?? 0) <= 0) return this.say("수리 키트가 없어요 — 섬 상점에서 팔아요", 2);
+    if (w.hullHp >= HULLS[w.hullLv].hp) return this.say("고칠 곳이 없어요", 1.5);
+    this.game.save();
+    const r = this.game.backend.trade({ kind: "use", item: "repair_kit", t: Date.now() });
+    if (r.ok) this.repairFx(r.message);
+    else this.say(r.message, 2, lutHex("coral"));
+  }
+
+  private repairFx(message: string): void {
+    const b = this.boat;
+    const add = message.match(/\+(\d+)/)?.[1];
+    this.fx.burst(b.x, b.y, 16, { colors: ["white", "yellow", "jade3"], speed: [15, 45], life: [0.5, 1], jitter: 6 });
+    this.fx.ring(b.x, b.y, "jade3", 18, 0.7);
+    if (add) this.fx.text(b.x, b.y - 18, `+${add}`, "jade3", { big: true, life: 1.2 });
+    this.hurtT = 0;
+    this.say(message, 2);
+  }
+
   /** A hard hit: splinters and spray where the hull struck, the boat blinks red, the view shakes. */
   private hitFx(dmg: number, reef: boolean): void {
     const b = this.boat, w = this.game.world;
@@ -498,7 +530,7 @@ export class SeaScene implements Scene {
       this.openChart();
     } else if (id === "bag") {
       this.pause = null;
-      this.bag = new InventoryPanel(this.game);
+      this.bag = this.openBag();
     } else if (id === "save") {
       this.pause = null;
       this.persist();
@@ -828,7 +860,7 @@ export class SeaScene implements Scene {
     const sea = tile?.sea ?? "jade";
 
     panel(ctx, assets, "panel_wood", 6, 6, 176, 60);
-    text(ctx, `${SEA_NAME[sea]}${tile?.deep ? " · 심해" : ""}`, 14, 13, { color: lutHex("bark1"), shadow: null });
+    text(ctx, `${SEA_NAME[sea]}${tile?.deep ? " · 심해" : ""}`, 14, 13, { color: lutHex("bark1"), shadow: null, maxW: 112 });
     text(ctx, this.game.clock.label(), 174, 13, { align: "right", color: lutHex("bark2"), shadow: null });
     const fmax = fuelMax(w);
     assets.draw(ctx, "ui", "icon_fuel", 12, 27);
@@ -840,6 +872,8 @@ export class SeaScene implements Scene {
     const low = w.hullHp / hmax < 0.3, blink = this.hurtT > 0 ? Math.floor(this.hurtT * 18) % 2 === 0 : low && Math.floor(this.t * 3) % 2 === 0;
     gaugeH(ctx, assets, 30, 48, 112, w.hullHp / hmax, blink ? lutHex(this.hurtT > 0 ? "white" : "red2") : low ? lutHex("coral") : lutHex("jade3"));
     text(ctx, `${w.hullHp}`, 174, 46, { align: "right", color: lutHex("bark1"), shadow: null });
+    const kits = this.game.backend.inventory().repair_kit ?? 0;
+    if (kits > 0 && w.hullHp < hmax) text(ctx, `R 수리 키트 ×${kits}`, 188, 46, { color: w.hullHp / hmax < 0.5 ? lutHex("yellow") : lutHex("foam2") });
 
     this.game.drawSaveLabel(ctx, assets, 8, 72);
     button(ctx, assets, "normal", "해도 M", HUD_CHART.x, HUD_CHART.y, HUD_CHART.w, HUD_CHART.h);
@@ -852,7 +886,7 @@ export class SeaScene implements Scene {
       const fresh = hold.reduce((s, h) => s + freshnessPct(h, w.seaTime, w.iceLv), 0) / hold.length;
       holdLine = `창고 ${hold.length}/${holdCap(w.holdLv)} · 신선도 ${Math.round(fresh)}%`;
     }
-    text(ctx, `${w.day}일차 · ${HULLS[w.hullLv].name} · ${holdLine} · ${this.game.backend.gold().toLocaleString("ko-KR")}G`, 6, 344, { color: lutHex("foam2") });
+    text(ctx, `${w.day}일차 · ${HULLS[w.hullLv].name} · ${holdLine} · ${this.game.backend.gold().toLocaleString("ko-KR")}G`, 6, 344, { color: lutHex("foam2"), maxW: 420 });
 
     if (this.storm > 0.2 && Math.floor(this.t * 2) % 2 === 0) text(ctx, "폭풍 속 — 파도가 배를 민다 · 희귀종이 잘 문다", 320, 30, { align: "center", color: lutHex("yellow") });
 
@@ -864,15 +898,17 @@ export class SeaScene implements Scene {
           ? `접안 · ${p.island.name}`
           : `낚시 · ${POINT_BY_ID[p.point.pointId]?.name ?? ""}${tile?.deep ? " (심해)" : ""}${this.storm > 0.2 ? " (폭풍)" : ""}`;
       const waiting = this.pending ? " — 멈추는 중…" : "";
-      button(ctx, assets, this.pending ? "pressed" : "hover", `Space · ${label}${waiting}`, PROMPT_BTN.x, PROMPT_BTN.y, PROMPT_BTN.w, PROMPT_BTN.h);
+      const s = `Space · ${label}${waiting}`;
+      const pw = Math.min(600, Math.max(PROMPT_BTN.w, textWidth(ctx, s) + 24));
+      button(ctx, assets, this.pending ? "pressed" : "hover", s, 320 - pw / 2, PROMPT_BTN.y, pw, PROMPT_BTN.h);
     } else if (this.state.k === "sail" && this.t < 6) {
       text(ctx, "방향키·WASD로 몰고, 클릭한 곳으로 항해 · 포인트에 멈춰 Space로 낚시", 320, 322, { align: "center", color: lutHex("foam2") });
     }
 
     if (this.toast) {
-      const tw = Math.max(160, textWidth(ctx, this.toast.text) + 28);
+      const tw = Math.min(620, Math.max(160, textWidth(ctx, this.toast.text) + 28));
       panel(ctx, assets, "panel_sea", 320 - tw / 2, 74, tw, 26);
-      text(ctx, this.toast.text, 320, 81, { align: "center", color: this.toast.color });
+      text(ctx, this.toast.text, 320, 81, { align: "center", color: this.toast.color, maxW: tw - 20 });
     }
     if (engine.dev) {
       const line = `${Math.round(this.boat.x / TILE)},${Math.round(this.boat.y / TILE)} · ${Math.round(Math.hypot(this.boat.vx, this.boat.vy))}px/s · ${engine.fps}fps  [H]선체 [F]연료 [T]+1h`;

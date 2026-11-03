@@ -115,6 +115,7 @@ async function apply(tx: Tx, accountId: string, body: SaveRequest, cur: { versio
   // ── the ledger the trades and catches play out on ──
   const { patch, flags } = applyReported(p, body.world);
   const keep = new Set(body.holdIds);
+  const clockEnd = patch.seaTime ?? p.seaTime;
   const ledger: Ledger = {
     gold: p.gold,
     hold: p.cargo.filter((it) => keep.has(it.id)), // fish lost when towed drop out
@@ -127,7 +128,7 @@ async function apply(tx: Tx, accountId: string, body: SaveRequest, cur: { versio
     tankLv: p.tankLv,
     iceLv: p.iceLv,
     holdLv: p.holdLv,
-    clock: patch.seaTime ?? p.seaTime,
+    clock: clockEnd,
     date: kstDate(now), // Economy.md §8-1: the server's KST date and clock
     now,
     log: normalizeLog(p.marketLog),
@@ -145,7 +146,10 @@ async function apply(tx: Tx, accountId: string, body: SaveRequest, cur: { versio
 
   for (const ev of events) {
     if (ev.kind === "op") {
-      const r = withBalance(cur.data, () => applyOp(ledger, body.ops[ev.index]! as ShopOp));
+      const op = body.ops[ev.index]! as ShopOp;
+      // freshness at the moment of the trade, kept inside what this batch could have seen
+      ledger.clock = Math.max(p.seaTime, Math.min(clockEnd, op.clock ?? clockEnd));
+      const r = withBalance(cur.data, () => applyOp(ledger, op));
       if (!r.ok) rejectedOps.push({ index: ev.index, why: r.why });
       continue;
     }

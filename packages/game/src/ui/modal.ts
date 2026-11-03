@@ -66,8 +66,8 @@ export class Modal {
     dim(ctx, 0.55);
     panel(ctx, assets, "panel_paper", x, y, W, h);
     text(ctx, this.opts.title, 320, y + 14, { align: "center", color: lutHex("red2"), shadow: null, font: "bold 12px Galmuri11, monospace" });
-    this.opts.lines.forEach((l, i) => text(ctx, l, 320, y + 38 + i * 18, { align: "center", color: lutHex("ink"), shadow: null }));
-    if (this.note) text(ctx, this.note, 320, y + 38 + this.opts.lines.length * 18, { align: "center", color: this.noteColor ?? lutHex("gray1"), shadow: null });
+    this.opts.lines.forEach((l, i) => text(ctx, l, 320, y + 38 + i * 18, { align: "center", color: lutHex("ink"), shadow: null, maxW: W - 24 }));
+    if (this.note) text(ctx, this.note, 320, y + 38 + this.opts.lines.length * 18, { align: "center", color: this.noteColor ?? lutHex("gray1"), shadow: null, maxW: W - 24 });
     buttons.forEach((b, i) => button(ctx, assets, this.busy ? "disabled" : i === this.sel ? "hover" : "normal", b.label, b.rect.x, b.rect.y, b.rect.w, b.rect.h));
   }
 }

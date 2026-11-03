@@ -204,6 +204,47 @@ check("연료 채우기: 50 for 50G", Math.round(v.world.fuel) === 100 && v.gold
 await page.waitForTimeout(200);
 await shot("m5-water-market");
 
+// ── 6b. 소모품: 소금 절임, 얼음 덩이 (창고 · 장비), 수리 키트 (바다에서 R) ──
+await page.evaluate(() => {
+  const { backend, game } = window.__sea;
+  const inv = backend.inventory();
+  inv.salt = 1; inv.ice_chunk = 1; inv.repair_kit = 1;
+  const h = backend.hold();
+  const t = game.world.seaTime;
+  h.push({ id: "m5:a", fishId: "rockfish", sizeCm: 25, spotId: "red_lighthouse_dock", caughtAt: new Date().toISOString(), freshAt: t - 1800 });
+  h.push({ id: "m5:b", fishId: "black_seabream", sizeCm: 30, spotId: "red_lighthouse_dock", caughtAt: new Date().toISOString(), freshAt: t - 1800 });
+});
+await press("KeyI");
+await waitFor((s) => s.panel === "bag", 2000, "bag");
+const holdOf = () => page.evaluate(() => window.__sea.backend.hold().filter((h) => h.id?.startsWith("m5:")).map((h) => ({ id: h.id, fishId: h.fishId, salted: h.salted, fresh: Math.round(100 - (window.__sea.game.world.seaTime - h.freshAt) / 60) })));
+// pick the 우럭 row and salt it
+const rowIdx = await page.evaluate(() => window.__sea.engine.currentScene.sub.bag.groups().findIndex((g) => g.fishId === "rockfish"));
+await page.evaluate((i) => (window.__sea.engine.currentScene.sub.bag.sel = i), rowIdx);
+await press("Enter");
+let hv = await holdOf();
+const salted = hv.find((h) => h.fishId === "rockfish");
+check("소금 절임 freezes one fish at its freshness", salted?.salted >= 68 && salted?.salted <= 71 && ((await view()).inv.salt ?? 0) === 0, JSON.stringify(salted));
+await press("ArrowRight"); // 장비 · 소지품
+const iceIdx = await page.evaluate(() => window.__sea.engine.currentScene.sub.bag.owned().indexOf("ice_chunk"));
+await page.evaluate((i) => (window.__sea.engine.currentScene.sub.bag.sel = i), iceIdx);
+await press("Enter");
+hv = await holdOf();
+const iced = hv.find((h) => h.fishId === "black_seabream");
+check("얼음 덩이 lifts the hold's freshness by 10%p", iced && iced.fresh >= 79 && iced.fresh <= 81, JSON.stringify(iced));
+await page.waitForTimeout(150);
+await shot("m5-bag-use");
+await press("Escape");
+await waitFor((s) => s.panel === null, 2000, "bag closed");
+await focus("sail");
+await press("Enter");
+await waitFor((s) => s.scene === "SeaScene" && s.k === "sail", 15_000, "sea");
+await page.evaluate(() => (window.__sea.game.world.hullHp = 40));
+await press("KeyR");
+v = await view();
+check("R at sea: 수리 키트 +25 (Lv1)", v.world.hullHp === 65 && (v.inv.repair_kit ?? 0) === 0, `hull ${v.world.hullHp}, kits ${v.inv.repair_kit}`);
+await page.evaluate(() => window.__sea.game.toIsland("water_market"));
+await waitFor((s) => s.island === "water_market", 5000, "back at 물장터");
+
 // ── 7. it all survives a reload ──
 const before = await view();
 await page.evaluate(() => window.__sea.game.save());

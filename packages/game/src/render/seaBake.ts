@@ -139,11 +139,11 @@ export function bakeSea(): Uint8Array {
   }
 
   const b: Bake = { out, W, H, landD, landIsl };
-  drawUnderwater(b);
   drawTrees(b);
   drawReefs(b, g);
   drawPiers(b, g);
   for (const isl of ISL) for (const part of isl.parts) drawPart(b, isl, part);
+  drawGangways(b);
   ISL.forEach((isl, k) => drawDeco(b, isl, k));
   drawHouses(b);
   return out;
@@ -241,43 +241,6 @@ const isWater = (b: Bake, x: number, y: number) => {
 
 // ── underwater landmarks ────────────────────────────────────────────────────
 
-function drawUnderwater(b: Bake): void {
-  // only open water (the tower itself is drawn on top later by drawPart)
-  /** Deepen (or, negative, lighten) the water at (x, y), like the drowned town (sink). */
-  const deepen = (x: number, y: number, steps: number) => {
-    x = Math.round(x);
-    y = Math.round(y);
-    if (x < 0 || y < 0 || x >= b.W || y >= b.H) return;
-    const i = y * b.W + x;
-    if (b.landD[i]! >= LANDL.shallow) b.out[i] = sink(b.out[i]!, steps);
-  };
-  for (const isl of ISL) {
-    if (!isl.deco.includes("school_under")) continue;
-    // the drowned school around 종탑섬 (design §3-1): a long two-storey block with the bell tower
-    // rising from its middle, and the schoolyard with its running track to the south — the water
-    // over them a shade deeper, like the drowned town's houses
-    const cx = isl.cx * TL, cy = isl.cy * TL;
-    const bw = 11 * TL, bh = 2.4 * TL, bx = cx - bw / 2, by = cy - bh / 2 - TL * 0.4;
-    for (let y = 0; y < bh; y++)
-      for (let x = 0; x < bw; x++) {
-        const ridge = Math.abs(y - bh / 2) < 1;
-        // window rows on the long faces
-        const win = (y === 3 || y === bh - 4) && x % 6 === 3 && x > 4 && x < bw - 4;
-        deepen(bx + x, by + y, ridge || win ? 2 : y < bh / 2 ? 1 : bayer(bx + x, by + y) < 0.5 ? 2 : 1);
-      }
-    // schoolyard + track
-    const yw = 9 * TL, yh = 2.6 * TL, yx = cx - yw / 2, yy = by + bh + TL * 0.6;
-    for (let y = 0; y < yh; y++)
-      for (let x = 0; x < yw; x++) if ((x + y) % 2 === 0) deepen(yx + x, yy + y, 1);
-    const rx = yw / 2 - 6, ry = yh / 2 - 5;
-    for (let k = 0; k < 160; k++) {
-      if (k % 3 === 2) continue;
-      const a = (k / 160) * Math.PI * 2;
-      deepen(yx + yw / 2 + Math.cos(a) * rx, yy + yh / 2 + Math.sin(a) * ry, -1); // the track's pale lines
-    }
-  }
-}
-
 function drawTrees(b: Bake): void {
   const CELL = 7;
   for (const isl of ISL) {
@@ -320,21 +283,92 @@ function drawReefs(b: Bake, g: ReturnType<typeof seaGrid>): void {
 
 const inPart = (fx: number, fy: number) => ISL.some((isl) => isl.parts.some((p) => fx - isl.cx >= p.x && fx - isl.cx < p.x + p.w && fy - isl.cy >= p.y && fy - isl.cy < p.y + p.h));
 
+/** Each dock's pier, drawn as one straight walkway from the dock toward the island — the grid's
+ *  pier tiles (what the boat bumps into) step diagonally, and drawing those tile by tile left a
+ *  staircase of loose planks that read as crates floating on the water. */
 function drawPiers(b: Bake, g: ReturnType<typeof seaGrid>): void {
   const isPier = (tx: number, ty: number) => tx >= 0 && ty >= 0 && tx < MW && ty < MH && g.kind[ty * MW + tx] === K_PIER;
-  for (let ty = 0; ty < MH; ty++)
-    for (let tx = 0; tx < MW; tx++) {
-      if (!isPier(tx, ty) || inPart(tx + 0.5, ty + 0.5)) continue; // structures are drawn by drawPart
-      const horizontal = isPier(tx - 1, ty) || isPier(tx + 1, ty) || !(isPier(tx, ty - 1) || isPier(tx, ty + 1));
-      for (let ly = 0; ly < TL; ly++)
-        for (let lx = 0; lx < TL; lx++) {
-          const along = horizontal ? lx : ly, across = horizontal ? ly : lx;
-          if (across < 4 || across > 11) continue;
-          const i = (ty * TL + ly) * b.W + tx * TL + lx;
-          b.out[i] = across === 4 || across === 11 ? PAL.bark1 : along % 4 === 0 ? PAL.bark2 : PAL.wood;
-          if ((across === 4 || across === 11) && along % 8 === 2) b.out[i] = PAL.ink;
+  const put = (x: number, y: number, c: number) => {
+    x = Math.round(x);
+    y = Math.round(y);
+    if (x >= 0 && y >= 0 && x < b.W && y < b.H) b.out[y * b.W + x] = c;
+  };
+  for (const isl of ISL) {
+    const [dx, dy] = isl.dock;
+    const vx = isl.cx - dx, vy = isl.cy - dy, len = Math.hypot(vx, vy) || 1;
+    const ux = vx / len, uy = vy / len, nx = -uy, ny = ux;
+    // how far the pier tiles run (the same walk seaGrid lays them with)
+    let last = 0;
+    for (let s = 1; s < 16; s++) {
+      const x = Math.round(dx + ux * s), y = Math.round(dy + uy * s);
+      if (!isPier(x, y) || inPart(x + 0.5, y + 0.5)) break;
+      last = s;
+    }
+    if (!last) continue;
+    const x0 = (dx + 0.5) * TL + ux * TL * 0.4, y0 = (dy + 0.5) * TL + uy * TL * 0.4;
+    const end = (last + 2) * TL;
+    // its shadow on the water first (down-right of the deck), then the deck over it
+    for (let t = 0; t <= end; t += 0.5) {
+      const cx = x0 + ux * t, cy = y0 + uy * t;
+      const ci = Math.round(cy) * b.W + Math.round(cx);
+      if (t > last * TL * 0.5 && (b.landD[ci]! < LANDL.sand || inPart(cx / TL, cy / TL))) break; // reached the island
+      for (let a = -4; a <= 4; a += 0.5) {
+        const px = Math.round(cx + nx * a + 1), py = Math.round(cy + ny * a + 2);
+        if (px < 0 || py < 0 || px >= b.W || py >= b.H) continue;
+        const i = py * b.W + px;
+        if (b.landD[i]! >= LANDL.sand) b.out[i] = sink(b.out[i]!, 1);
+      }
+    }
+    for (let t = 0; t <= end; t += 0.5) {
+      const cx = x0 + ux * t, cy = y0 + uy * t;
+      const ci = Math.round(cy) * b.W + Math.round(cx);
+      if (t > last * TL * 0.5 && (b.landD[ci]! < LANDL.sand || inPart(cx / TL, cy / TL))) {
+        // run the boards a few px onto the beach so the pier meets the shore
+        for (let k = 0; k < 6; k += 0.5) for (let a = -3; a <= 3; a += 0.5) put(cx + ux * k + nx * a, cy + uy * k + ny * a, Math.floor(t + k) % 4 === 0 ? PAL.bark2 : PAL.wood);
+        break;
+      }
+      for (let a = -4; a <= 4; a += 0.5) {
+        const edge = Math.abs(a) >= 3.5;
+        put(cx + nx * a, cy + ny * a, edge ? PAL.bark1 : Math.floor(t) % 4 === 0 ? PAL.bark2 : a < -1.5 ? PAL.sand1 : PAL.wood);
+      }
+      // mooring posts along both sides
+      if (Math.floor(t) % 14 === 3 && t % 1 === 0) for (const side of [-5, 5]) put(cx + nx * side, cy + ny * side, PAL.ink);
+    }
+  }
+}
+
+/** Rafts lashed to their village: a short plank gangway from each raft to the nearest other
+ *  structure, so a cluster reads as one floating village and not as loose crates. */
+function drawGangways(b: Bake): void {
+  for (const isl of ISL) {
+    const parts = isl.parts;
+    for (const p of parts) {
+      if (p.mat !== "raft") continue;
+      const pc = [p.x + p.w / 2, p.y + p.h / 2] as const;
+      let best: Part | null = null, bd = Infinity;
+      for (const q of parts) {
+        if (q === p || q.mat.startsWith("boat")) continue;
+        const d = Math.hypot(q.x + q.w / 2 - pc[0], q.y + q.h / 2 - pc[1]);
+        if (d < bd) (bd = d), (best = q);
+      }
+      if (!best) continue;
+      const q = best;
+      // the gap between the two along the axis they're apart on
+      const gapX = Math.max(q.x - (p.x + p.w), p.x - (q.x + q.w)), gapY = Math.max(q.y - (p.y + p.h), p.y - (q.y + q.h));
+      const horizontal = gapX > gapY;
+      const gap = horizontal ? gapX : gapY;
+      if (gap <= 0 || gap > 2.5) continue;
+      const lo = horizontal ? Math.max(p.y, q.y) : Math.max(p.x, q.x), hi = horizontal ? Math.min(p.y + p.h, q.y + q.h) : Math.min(p.x + p.w, q.x + q.w);
+      const mid = (hi > lo ? (lo + hi) / 2 : horizontal ? pc[1] : pc[0]);
+      const from = horizontal ? Math.min(p.x + p.w, q.x + q.w) : Math.min(p.y + p.h, q.y + q.h);
+      for (let t = -1; t <= gap * TL + 1; t++)
+        for (let a = -3; a <= 3; a++) {
+          const along = from * TL + t, across = mid * TL + a;
+          const x = (isl.cx * TL) + (horizontal ? along : across), y = (isl.cy * TL) + (horizontal ? across : along);
+          put(b, x, y, Math.abs(a) === 3 ? PAL.bark1 : t % 3 === 0 ? PAL.bark2 : PAL.wood);
         }
     }
+  }
 }
 
 // ── built structures ────────────────────────────────────────────────────────
@@ -458,7 +492,7 @@ function drawDeco(b: Bake, isl: Island, k: number): void {
         }
         break;
       case "school_under":
-        break; // drawn under the water in drawUnderwater
+        break; // (the drowned school was dropped: under the top-down view it read as a box)
       case "bridge_houses":
         for (let s = 0; s < 8; s++) {
           const x = cx - 180 + s * 46, y = cy - 6 + (s % 2) * 7;

@@ -286,13 +286,72 @@ export function itemPrice(islandId: string, item: ItemId, hullLv: number): numbe
 
 // ── trades ──
 
-export type ShopOp =
+export type ShopOp = (
   | { kind: "sell"; island: string; ids: string[]; t: number }
   | { kind: "buy"; island: string; item: ItemId; t: number }
   | { kind: "fuel"; island: string; t: number }
   | { kind: "repair"; island: string; t: number }
   | { kind: "gift"; island: string; t: number }
-  | { kind: "tow"; island: string; t: number };
+  | { kind: "tow"; island: string; t: number }
+  /** Use a consumable anywhere: 수리 키트, 얼음 덩이, or 소금 on one fish (`target` = hold item id). */
+  | { kind: "use"; item: ItemId; target?: string; t: number }
+) & {
+  /** WorldState.seaTime when it happened (freshness); the server keeps it inside the batch's span. */
+  clock?: number;
+};
+
+const CONSUMABLE_DEFAULTS = { repairKitPct: 0.25, iceChunkPct: 10 };
+const consumables = () => ({ ...CONSUMABLE_DEFAULTS, ...balance().economy.consumables });
+
+/** Can this catch be salted / iced? (trash and pollutants don't spoil) */
+const perishable = (h: HoldLike) => {
+  const f = FISH_BY_ID[h.fishId];
+  return !!f && !f.trash && f.rarity !== "boss";
+};
+
+/** Using a consumable (no market needed). */
+function applyUse(l: Ledger, op: Extract<ShopOp, { kind: "use" }>): OpResult {
+  const def = ITEMS[op.item];
+  if (!def || def.kind !== "consumable") return fail("not_usable", "쓸 수 없는 물건이에요");
+  if ((l.inventory[op.item] ?? 0) <= 0) return fail("none", `${def.name}이(가) 없어요`);
+  const clock = op.clock ?? l.clock;
+  const c = consumables();
+  let message: string;
+  switch (op.item) {
+    case "repair_kit": {
+      const max = HULLS[l.hullLv].hp;
+      if (l.hullHp >= max) return fail("not_needed", "고칠 곳이 없어요");
+      const add = Math.min(max - l.hullHp, Math.ceil(max * c.repairKitPct));
+      l.hullHp += add;
+      message = `수리 키트 · 선체 +${add}`;
+      break;
+    }
+    case "salt": {
+      const h = l.hold.find((x) => x.id && x.id === op.target);
+      if (!h) return fail("no_target", "절일 물고기를 골라 주세요");
+      if (!perishable(h)) return fail("not_perishable", "이건 상하지 않아요");
+      if (h.salted !== undefined) return fail("salted", "이미 소금에 절였어요");
+      h.salted = Math.round(freshnessPct(h, clock, l.iceLv));
+      message = `${FISH_BY_ID[h.fishId]?.name ?? "물고기"} 소금 절임 · 신선도 ${h.salted}%로 고정`;
+      break;
+    }
+    case "ice_chunk": {
+      const fish = l.hold.filter((h) => perishable(h) && h.salted === undefined && freshnessPct(h, clock, l.iceLv) < 100);
+      if (!fish.length) return fail("nothing", "신선도를 올릴 물고기가 없어요");
+      for (const h of fish) {
+        // +N %p = the fish was caught N / (decay per minute) minutes later, never later than now
+        const perMin = FRESH_DECAY_PER_MIN[Math.max(0, Math.min(FRESH_DECAY_PER_MIN.length - 1, l.iceLv))]! * (h.rot ?? 1);
+        h.freshAt = Math.min(clock, (h.freshAt ?? clock) + (c.iceChunkPct / perMin) * 60);
+      }
+      message = `얼음 덩이 · ${fish.length}마리 신선도 +${c.iceChunkPct}%p`;
+      break;
+    }
+    default:
+      return fail("not_usable", "쓸 수 없는 물건이에요");
+  }
+  l.inventory[op.item] = (l.inventory[op.item] ?? 0) - 1;
+  return { ok: true, gold: 0, message };
+}
 
 /** Everything a trade can touch. */
 export type Ledger = {
@@ -338,7 +397,7 @@ export function quote(l: Ledger, islandId: string, item: ItemId): { cost: number
   if (def.level !== undefined) {
     const have = levelOf(l, def.kind);
     if (have >= def.level) return { cost: 0, why: "이미 있어요" };
-    if (have !== def.level - 1) return { cost: 0, why: `Lv${def.level - 1}부터 차례로 살 수 있어요` };
+    if (have !== def.level - 1) return { cost: 0, why: `Lv${def.level - 1}이 먼저 필요해요` };
   }
   if (def.max !== undefined && (l.inventory[item] ?? 0) >= def.max) return { cost: 0, why: `최대 ${def.max}개까지` };
   return { cost: itemPrice(islandId, item, l.hullLv) };
@@ -372,6 +431,7 @@ export function towQuote(l: Ledger, islandId: string): number {
 
 /** Apply one trade to the ledger (mutates it on success). The client and the server run this same code. */
 export function applyOp(l: Ledger, op: ShopOp): OpResult {
+  if (op.kind === "use") return applyUse(l, op);
   const m = op.kind === "tow" ? (MARKETS[op.island] ?? null) : marketOf(op.island);
   if (!m) return fail("closed", "마을이 아직 문을 닫았어요");
   switch (op.kind) {

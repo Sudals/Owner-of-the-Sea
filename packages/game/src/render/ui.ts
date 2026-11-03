@@ -6,9 +6,26 @@ import { lutHex } from "../assets";
 export const FONT = "12px Galmuri11, monospace";
 export const LINE_H = 13;
 
-type TextOpts = { color?: string; shadow?: string | null; align?: CanvasTextAlign; font?: string };
+type TextOpts = {
+  color?: string;
+  shadow?: string | null;
+  align?: CanvasTextAlign;
+  font?: string;
+  /** Never wider than this (px): cut with "…" so it stays inside its box. */
+  maxW?: number;
+};
+
+/** `s` cut to `w` px with an ellipsis (as drawn in `font`). */
+export function fitText(ctx: CanvasRenderingContext2D, s: string, w: number, font = FONT): string {
+  ctx.font = font;
+  if (ctx.measureText(s).width <= w) return s;
+  let t = s;
+  while (t.length > 1 && ctx.measureText(`${t}…`).width > w) t = t.slice(0, -1);
+  return `${t}…`;
+}
 
 export function text(ctx: CanvasRenderingContext2D, s: string, x: number, y: number, o: TextOpts = {}): number {
+  if (o.maxW !== undefined) s = fitText(ctx, s, o.maxW, o.font ?? FONT);
   ctx.font = o.font ?? FONT;
   ctx.textBaseline = "top";
   ctx.textAlign = o.align ?? "left";
@@ -103,7 +120,8 @@ export function button(ctx: CanvasRenderingContext2D, assets: Assets, state: But
   part(0, f.h - c, c, c, x, y + h - c, c, c);
   part(f.w - c, f.h - c, c, c, x + w - c, y + h - c, c, c);
   const color = state === "disabled" ? lutHex("gray1") : lutHex("ink");
-  text(ctx, label, x + w / 2, y + Math.round((h - 12) / 2) + (state === "pressed" ? 1 : 0), { align: "center", color, shadow: null });
+  // a label never spills out of its button
+  text(ctx, label, x + w / 2, y + Math.round((h - 12) / 2) + (state === "pressed" ? 1 : 0), { align: "center", color, shadow: null, maxW: w - 8 });
 }
 
 /** Darken the whole view (behind dialogs). */

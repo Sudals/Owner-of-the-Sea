@@ -1023,6 +1023,10 @@
    "4": 225
   },
   "towFeeRate": 0.5,
+  "consumables": {
+   "repairKitPct": 0.25,
+   "iceChunkPct": 10
+  },
   "openIslands": [
    "red_lighthouse",
    "water_market",

@@ -21,7 +21,8 @@
     "balance:check": "tsx scripts/balance.mts check",
     "balance:apply": "tsx scripts/balance.mts apply",
     "desktop": "pnpm --filter @sea/client build && pnpm --filter @sea/desktop start",
-    "dist:win": "pnpm --filter @sea/desktop dist:win"
+    "dist:win": "pnpm --filter @sea/desktop dist:win",
+    "sim:economy": "tsx scripts/sim-economy.mts"
   },
   "devDependencies": {
     "@types/pg": "^8.23.1",

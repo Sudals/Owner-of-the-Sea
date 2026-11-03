@@ -657,7 +657,7 @@ export class FishingScene implements Scene {
       const r = s.reel;
       const x = 220, y = 8, w = 200;
       panel(ctx, assets, "panel_sea", x, y, w, 52);
-      text(ctx, s.hooked.fish.rarity === "boss" ? `오염체! ${s.hooked.fish.name}` : "텐션", x + 10, y + 7);
+      text(ctx, s.hooked.fish.rarity === "boss" ? `오염체! ${s.hooked.fish.name}` : "텐션", x + 10, y + 7, { maxW: w - 70 });
       text(ctx, `${Math.max(0, r.dist).toFixed(1)}m`, x + w - 10, y + 7, { align: "right", color: lutHex("foam1") });
       const tc = r.tension > 0.8 ? lutHex("coral") : r.tension > 0.6 ? lutHex("yellow") : lutHex("jade3");
       gaugeH(ctx, assets, x + 10, y + 22, w - 20, r.tension, tc, [0.6, 0.8]);
@@ -678,12 +678,12 @@ export class FishingScene implements Scene {
     const gear = this.backend.gear();
     const sp = this.spot;
     const tags = sp.kind === "boat" ? `${sp.deep ? " (심해)" : ""}${sp.storm ? " (폭풍)" : ""}` : "";
-    text(ctx, `${this.point.name}${tags} · 창고 ${hold}마리 · 낚싯대 Lv${gear.rodLv} · 줄 Lv${gear.lineLv}`, 6, 344, { color: lutHex("foam2") });
+    text(ctx, `${this.point.name}${tags} · 창고 ${hold}마리 · 낚싯대 Lv${gear.rodLv} · 줄 Lv${gear.lineLv}`, 6, 344, { color: lutHex("foam2"), maxW: 540 });
 
     if (this.toast) {
-      const w = Math.max(160, textWidth(ctx, this.toast.text) + 28);
+      const w = Math.min(620, Math.max(160, textWidth(ctx, this.toast.text) + 28));
       panel(ctx, assets, "panel_sea", 320 - w / 2, 70, w, 30);
-      text(ctx, this.toast.text, 320, 79, { align: "center" });
+      text(ctx, this.toast.text, 320, 79, { align: "center", maxW: w - 20 });
     }
     if (s.k === "loading") text(ctx, "…", 320, 170, { align: "center" });
 
@@ -712,9 +712,16 @@ export class FishingScene implements Scene {
   private drawResultCard(ctx: CanvasRenderingContext2D, h: Hooked, t: number): void {
     const assets = this.engine.assets;
     const ff = assets.frame(h.fish.sheet, h.fish.id);
-    const w = Math.max(220, ff.w + 40), hgt = 70 + ff.h;
+    const junk0 = !!h.fish.trash, s0 = this.state, released0 = s0.k === "caught" && s0.released;
+    const tier0 = h.fish.tier ? ` ${h.fish.tier}` : "";
+    const lines0 = [
+      junk0 ? h.fish.name : `${h.fish.name}  ${h.roll.sizeCm.toFixed(1)}cm`,
+      junk0 ? (released0 ? "창고가 가득 차 바다에 두었다" : "섬에서 처리하면 몇 G는 받는다") : `${GRADE_LABEL[h.fish.rarity]}${tier0} · 크기 ${h.roll.sizeGrade}급 · ${released0 ? "창고가 가득 차 놓아주었다" : "창고에 넣었다"}`,
+    ];
+    // as wide as its longest line (and the fish), kept on screen
+    const w = Math.min(330, Math.max(220, ff.w + 40, ...lines0.map((l) => textWidth(ctx, l) + 24))), hgt = 70 + ff.h;
     // over the water, clear of the angler holding up the catch
-    const cx = 470;
+    const cx = Math.min(470, 636 - w / 2);
     const x = Math.round(cx - w / 2), y = 24;
     panel(ctx, assets, "panel_paper", x, y, w, hgt);
     const ink = lutHex("ink"), muted = lutHex("bark2");

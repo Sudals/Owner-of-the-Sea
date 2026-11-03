@@ -3,6 +3,8 @@ import { z } from "zod";
 // Seed sessions and saves — design §11-3. Shared by RemoteBackend and the API routes.
 
 const id = z.string().min(1).max(48);
+/** seaTime when a trade happened (optional: clients before it send none). */
+const opClock = z.number().min(0).optional();
 
 // ── POST /api/session/open ──
 
@@ -96,12 +98,13 @@ export const saveRequest = z.object({
   ops: z
     .array(
       z.discriminatedUnion("kind", [
-        z.object({ kind: z.literal("sell"), island: id, ids: z.array(z.string().max(80)).max(200), t: z.number().int() }),
-        z.object({ kind: z.literal("buy"), island: id, item: z.string().max(40), t: z.number().int() }),
-        z.object({ kind: z.literal("fuel"), island: id, t: z.number().int() }),
-        z.object({ kind: z.literal("repair"), island: id, t: z.number().int() }),
-        z.object({ kind: z.literal("gift"), island: id, t: z.number().int() }),
-        z.object({ kind: z.literal("tow"), island: id, t: z.number().int() }),
+        z.object({ kind: z.literal("sell"), island: id, ids: z.array(z.string().max(80)).max(200), t: z.number().int(), clock: opClock }),
+        z.object({ kind: z.literal("buy"), island: id, item: z.string().max(40), t: z.number().int(), clock: opClock }),
+        z.object({ kind: z.literal("fuel"), island: id, t: z.number().int(), clock: opClock }),
+        z.object({ kind: z.literal("repair"), island: id, t: z.number().int(), clock: opClock }),
+        z.object({ kind: z.literal("gift"), island: id, t: z.number().int(), clock: opClock }),
+        z.object({ kind: z.literal("tow"), island: id, t: z.number().int(), clock: opClock }),
+        z.object({ kind: z.literal("use"), item: z.string().max(40), target: z.string().max(80).optional(), t: z.number().int(), clock: opClock }),
       ]),
     )
     .max(200)

@@ -155,6 +155,8 @@ export const balanceSchema = z
         repairPerHp: z.record(z.string(), z.number().min(0)),
         repairKitPrice: z.record(z.string(), z.number().min(0)),
         towFeeRate: z.number().min(0),
+        /** Optional so versions stored before it still parse (defaults in economy.ts). */
+        consumables: z.object({ repairKitPct: z.number().min(0).max(1), iceChunkPct: z.number().min(0).max(100) }).strict().optional(),
         openIslands: z.array(z.string()),
         markets: z.record(z.string(), marketSchema),
         items: z.record(z.string(), itemSchema),

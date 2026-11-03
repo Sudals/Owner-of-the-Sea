@@ -74,6 +74,11 @@ export class Game {
     return c.includes(this.bait) ? this.bait : c[0]!;
   }
 
+  /** Put this bait on the hook (창고 · 장비 → Enter). */
+  chooseBait(id: string): void {
+    this.bait = id;
+  }
+
   cycleBait(d: number): void {
     const c = this.baitChoices();
     const i = c.indexOf(this.currentBait());
@@ -216,9 +221,9 @@ export class Game {
   drawFlash(ctx: CanvasRenderingContext2D, assets: Assets): void {
     const f = this.flashMsg;
     if (!f || performance.now() > f.until) return;
-    const w = Math.max(140, textWidth(ctx, f.text) + 28);
+    const w = Math.min(620, Math.max(140, textWidth(ctx, f.text) + 28));
     panel(ctx, assets, "panel_sea", 320 - w / 2, 300, w, 26);
-    text(ctx, f.text, 320, 307, { align: "center", color: f.color });
+    text(ctx, f.text, 320, 307, { align: "center", color: f.color, maxW: w - 20 });
   }
 
   /** Small HUD line with the save status (full build). */

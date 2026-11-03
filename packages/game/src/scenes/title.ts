@@ -521,15 +521,15 @@ export class TitleScene implements Scene {
 
     if (s.k === "name" || s.k === "code") {
       heading(s.k === "name" ? "새 게임" : "이어하기 코드");
-      text(ctx, s.k === "name" ? "선장의 이름을 정해 주세요" : "다른 PC에서 받은 16자리 코드를 넣어 주세요", 320, D.y + 36, { align: "center", color: ink, shadow: null });
+      text(ctx, s.k === "name" ? "선장의 이름을 정해 주세요" : "다른 PC에서 받은 16자리 코드를 넣어 주세요", 320, D.y + 36, { align: "center", color: ink, shadow: null, maxW: D.w - 24 });
       text(ctx, s.k === "name" ? "2~12자 · 한글, 영문, 숫자" : "예: 7KQ2-M9XA-04TD-R3HB", 320, D.y + 52, { align: "center", color: soft, shadow: null });
       this.drawField(ctx, s.k === "code");
       const msg = s.busy ? "잠시만요…" : s.error;
       const fallback = s.k === "name" ? (this.game.mode === "full" ? "순위표에 이 이름이 표시돼요" : "") : "";
-      if (msg || fallback) text(ctx, msg ?? fallback, 320, FIELD.y + FIELD.h + 8, { align: "center", color: msg && !s.busy ? lutHex("red2") : soft, shadow: null });
+      if (msg || fallback) text(ctx, msg ?? fallback, 320, FIELD.y + FIELD.h + 8, { align: "center", color: msg && !s.busy ? lutHex("red2") : soft, shadow: null, maxW: D.w - 24 });
     } else if (s.k === "confirm") {
       heading(s.kind === "quit" ? "종료" : s.kind === "forget" ? "기록 지우기" : "새 게임");
-      s.lines.forEach((l, i) => text(ctx, l, 320, D.y + 48 + i * 18, { align: "center", color: ink, shadow: null }));
+      s.lines.forEach((l, i) => text(ctx, l, 320, D.y + 48 + i * 18, { align: "center", color: ink, shadow: null, maxW: D.w - 24 }));
     } else if (s.k === "notice") {
       heading(s.title);
       let y = D.y + 40;
@@ -537,7 +537,7 @@ export class TitleScene implements Scene {
         text(ctx, s.big, 320, y, { align: "center", color: lutHex("navy"), shadow: null, font: "bold 24px Galmuri11, monospace" });
         y += 40;
       }
-      s.lines.forEach((l, i) => text(ctx, l, 320, y + i * 18, { align: "center", color: ink, shadow: null }));
+      s.lines.forEach((l, i) => text(ctx, l, 320, y + i * 18, { align: "center", color: ink, shadow: null, maxW: D.w - 24 }));
     }
     this.drawButtons(ctx, items);
   }

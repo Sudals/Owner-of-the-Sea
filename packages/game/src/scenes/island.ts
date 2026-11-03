@@ -424,9 +424,9 @@ export class IslandScene implements Scene {
     else if (this.sub?.k === "bag") this.sub.bag.render(ctx, engine);
 
     if (this.toast) {
-      const tw = Math.max(160, textWidth(ctx, this.toast.text) + 28);
+      const tw = Math.min(620, Math.max(160, textWidth(ctx, this.toast.text) + 28));
       panel(ctx, assets, "panel_sea", 320 - tw / 2, this.sub ? 2 : 40, tw, 22);
-      text(ctx, this.toast.text, 320, (this.sub ? 2 : 40) + 5, { align: "center", color: this.toast.color });
+      text(ctx, this.toast.text, 320, (this.sub ? 2 : 40) + 5, { align: "center", color: this.toast.color, maxW: tw - 20 });
     }
     this.fx.draw(ctx);
     this.fx.drawScreen(ctx);
@@ -535,8 +535,8 @@ export class IslandScene implements Scene {
       const c = row.why ? lutHex("gray1") : ink;
       const name = `${def.name}${def.bundle ? ` ×${def.bundle}` : ""}`;
       text(ctx, fit(ctx, name, 128), r.x + 10, y, { color: c, shadow: null });
-      text(ctx, fit(ctx, def.desc, 268), r.x + 144, y, { color: row.why ? lutHex("gray1") : muted, shadow: null });
-      text(ctx, row.why ?? row.have, r.x + 420, y, { color: muted, shadow: null });
+      text(ctx, fit(ctx, def.desc, 216), r.x + 144, y, { color: row.why ? lutHex("gray1") : muted, shadow: null });
+      text(ctx, row.why ?? row.have, r.x + 370, y, { color: muted, shadow: null, maxW: r.w - 10 - 56 - 370 });
       text(ctx, `${row.price}G`, r.x + r.w - 10, y, { align: "right", color: off && !row.why ? lutHex("coral") : c, shadow: null });
     });
     button(ctx, assets, sub.sel === rows.length ? "hover" : "normal", "닫기", this.closeRect.x, this.closeRect.y, this.closeRect.w, this.closeRect.h);

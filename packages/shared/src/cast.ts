@@ -76,7 +76,12 @@ function rollTrash(seedHex: string, castIndex: number, point: FishingPoint): { f
   const rt = seeded(seedHex, "trash", castIndex);
   const chance = t.chance[point.sea] + (point.kind === "dock" ? t.dockBonus : 0);
   if (rt() >= chance) return null;
-  const kinds = Object.entries(t.kinds).map(([id, k]) => [id, k.weight * (k.bySea?.[point.sea] ?? 1)] as const).filter(([, w]) => w > 0);
+  // sorted by id: a balance read back from Postgres jsonb has its keys in another order, and the
+  // weighted pick must not depend on it
+  const kinds = Object.entries(t.kinds)
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([id, k]) => [id, k.weight * (k.bySea?.[point.sea] ?? 1)] as const)
+    .filter(([, w]) => w > 0);
   if (!kinds.length) return null;
   const fishId = weighted(rt, kinds);
   const [min, max] = t.kinds[fishId]!.sizeCm;

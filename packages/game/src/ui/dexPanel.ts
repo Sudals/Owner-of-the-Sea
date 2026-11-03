@@ -75,7 +75,7 @@ export class DexPanel {
       if (e) assets.draw(ctx, f.sheet, f.id, sx, sy);
       else assets.drawSilhouette(ctx, f.sheet, f.id, sx, sy, lutHex("bark2"));
       const label = e ? `${f.name} · ${e.maxSizeCm.toFixed(1)}cm` : "???";
-      text(ctx, label, cx + (CW - 6) / 2, cy + 35, { align: "center", color: lutHex(e ? "ink" : "bark2"), shadow: null });
+      text(ctx, label, cx + (CW - 6) / 2, cy + 35, { align: "center", color: lutHex(e ? "ink" : "bark2"), shadow: null, maxW: CW - 10 });
       if (e) text(ctx, `×${e.count}`, cx + CW - 9, cy + 2, { align: "right", color: lutHex("bark2"), shadow: null });
       if (f.rarity === "rare" || f.rarity === "legendary") text(ctx, GRADE_LABEL[f.rarity], cx + 3, cy + 2, { color: lutHex(f.rarity === "legendary" ? "red2" : "sea1"), shadow: null });
     });

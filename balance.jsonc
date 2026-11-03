@@ -245,6 +245,11 @@
     "repairKitPrice": { "1": 20, "2": 55, "3": 125, "4": 225 },
     // 견인비 = 그 섬의 전부 수리비 × towFeeRate (수리비는 따로 낸다). 골드가 모자라면 0까지만
     "towFeeRate": 0.5,
+    // 소모품을 썼을 때 (Economy.md §4-5, §4-6). 어디서나 쓸 수 있다 (창고·장비 화면, 바다에서 R = 수리 키트)
+    //  repairKitPct  수리 키트 1개가 채우는 내구도 (최대 내구도 대비, 0.25 = 25%)
+    //  iceChunkPct   얼음 덩이 1개가 창고 전체 물고기의 신선도를 올리는 양 (%p, 100은 넘지 않음)
+    //  소금은 물고기 1마리의 신선도를 지금 값으로 고정하고 판매가 × saltedMult (소금꽃섬은 제값)
+    "consumables": { "repairKitPct": 0.25, "iceChunkPct": 10 },
 
     // 지금 문을 연 마을 (나머지는 섬 이야기와 함께 M7에서 연다)
     "openIslands": ["red_lighthouse", "water_market", "salt_flower", "bell_tower"],
