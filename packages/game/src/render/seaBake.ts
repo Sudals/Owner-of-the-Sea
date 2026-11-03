@@ -14,7 +14,7 @@ const PAL = { ...C };
 const TL = TILE, MW = MAP_W, MH = MAP_H;
 const LANDL = { ...LAND };
 const F_RUINS = FLAG_RUINS, F_VALLEY = FLAG_VALLEY, R_CUT = RUINS_CUT;
-const K_REEF = Kind.Reef, K_PIER = Kind.Pier;
+const K_REEF = Kind.Reef, K_PIER = Kind.Pier, K_WATER = Kind.Water;
 const ISL: Island[] = [...ISLANDS];
 const VAL = { ...VALLEY };
 const ruinsF = ruinsField, fbmF = fbm, islandF = islandField, depthF = depthAt, deepF = deepField;
@@ -132,22 +132,6 @@ export function bakeSea(): Uint8Array {
         c = ground === "black" ? (bayer(x, y) < 0.5 ? PAL.gray1 : PAL.violet1) : bayer(x, y) < 0.7 ? PAL.foam2 : PAL.white; // surf (oily on 검은모래섬)
       }
 
-      // drowned town: a street grid with roofed blocks, seen through jade water
-      if (flags & F_RUINS) {
-        const strength = Math.min(1, (ruinsF(fx, fy) - R_CUT) / 0.08 + 0.35);
-        const BX = 3 * TL, BY = 2 * TL;
-        const bx = Math.floor(x / BX), by = Math.floor(y / BY), lx = x - bx * BX, ly = y - by * BY;
-        const street = lx < 4 || ly < 4;
-        const hb = hash(bx, by, 9);
-        const show = bayer(x, y) < 0.55 * strength;
-        if (street) {
-          if (show && (lx === 1 || ly === 1)) c = PAL.gray1;
-        } else if (hb > 0.18 && show) {
-          const roofs = [PAL.red2, PAL.jade1, PAL.wood, PAL.deep1];
-          const inset = lx < 6 || ly < 6 || lx > BX - 3 || ly > BY - 3;
-          c = inset ? PAL.jade1 : roofs[Math.floor(hb * 4) % 4]!;
-        }
-      }
       if (vk > 0 && fbmF(fx * 3, fy * 3, 19, 2) > 0.62 && bayer(x, y) < 0.5 * vk) c = PAL.violet1; // oil sheen
 
       out[i] = c;
@@ -155,6 +139,7 @@ export function bakeSea(): Uint8Array {
   }
 
   const b: Bake = { out, W, H, landD, landIsl };
+  drawDrownedTown(b, g);
   drawUnderwater(b);
   drawTrees(b);
   drawReefs(b, g);
@@ -166,6 +151,58 @@ export function bakeSea(): Uint8Array {
 }
 
 type Bake = { out: Uint8Array; W: number; H: number; landD: Float32Array; landIsl: Int8Array };
+
+/** 잠긴 마을 (design §3-3): roofs and streets of the drowned town under the jade water.
+ *  Drawn as clean shapes one or two shades darker than the water around them — the water
+ *  "tints" them — so they read as sunken houses, not as dithered stains. Each 3×2-tile block
+ *  holds 0–2 houses (gable roof: north face, ridge, south face), with streets between. */
+function drawDrownedTown(b: Bake, g: ReturnType<typeof seaGrid>): void {
+  const BX = 3 * TL, BY = 2 * TL;
+  // [north face, south face, ridge]: mostly mossy teal, now and then an old brown roof
+  const TEAL: [number, number, number] = [PAL.jade2, PAL.jade1, PAL.deep2];
+  const DEEP: [number, number, number] = [PAL.jade1, PAL.deep2, PAL.deep1];
+  const BROWN: [number, number, number] = [PAL.wood, PAL.bark2, PAL.bark1];
+  const onWater = (x: number, y: number) => {
+    if (x < 0 || y < 0 || x >= b.W || y >= b.H) return -1;
+    const i = y * b.W + x;
+    if (b.landD[i]! < LANDL.shallow) return -1;
+    const ti = Math.floor(y / TL) * MW + Math.floor(x / TL);
+    return g.flags[ti]! & F_RUINS && g.kind[ti] === K_WATER ? i : -1;
+  };
+  const put = (x: number, y: number, c: number) => {
+    const i = onWater(x, y);
+    if (i >= 0) b.out[i] = c;
+  };
+  for (let by = 0; by * BY < b.H; by++)
+    for (let bx = 0; bx * BX < b.W; bx++) {
+      const x0 = bx * BX, y0 = by * BY;
+      const ti = Math.floor((y0 + BY / 2) / TL) * MW + Math.floor((x0 + BX / 2) / TL);
+      if (!(g.flags[ti]! & F_RUINS)) continue;
+      // toward the edge of the town the houses thin out
+      const strength = Math.max(0, Math.min(1, (ruinsF((x0 + BX / 2) / TL, (y0 + BY / 2) / TL) - R_CUT) / 0.08 + 0.3));
+      // streets: a faint dashed line along the block's north and west edges
+      for (let x = 0; x < BX; x++) if ((x >> 1) % 2 === 0 && strength > 0.45) put(x0 + x, y0 + 1, PAL.jade1);
+      for (let y = 0; y < BY; y++) if ((y >> 1) % 2 === 0 && strength > 0.45) put(x0 + 1, y0 + y, PAL.jade1);
+      const n = hash(bx, by, 9) > strength ? 0 : hash(bx, by, 10) < 0.55 ? 1 : 2;
+      for (let k = 0; k < n; k++) {
+        const w = 12 + Math.floor(hash(bx, by, 20 + k) * 8), h = 8 + Math.floor(hash(bx, by, 30 + k) * 4) * 2;
+        const half = n === 2 ? BX / 2 : BX;
+        const hx = x0 + (n === 2 && k === 1 ? BX / 2 : 0) + 5 + Math.floor(hash(bx, by, 40 + k) * Math.max(0, half - 8 - w));
+        const hy = y0 + 5 + Math.floor(hash(bx, by, 50 + k) * Math.max(0, BY - 9 - h));
+        // only whole houses: a roof cut by the shore or the town's edge would read as a stray sliver
+        const fits = [[0, 0], [w, 0], [0, h], [w, h], [w >> 1, h >> 1]].every(([dx, dy]) => onWater(hx + dx!, hy + dy!) >= 0);
+        if (!fits) continue;
+        const r = hash(bx, by, 60 + k);
+        const [north, south, ridgeC] = r < 0.2 ? BROWN : r < 0.6 ? TEAL : DEEP;
+        const ridge = h / 2;
+        for (let y = 0; y < h; y++)
+          for (let x = 0; x < w; x++) put(hx + x, hy + y, y === ridge || y === ridge - 1 ? ridgeC : y < ridge ? north : south);
+        // the house's shadow on the sea floor (south and east)
+        for (let x = 2; x <= w; x++) put(hx + x, hy + h, PAL.deep1);
+        for (let y = 2; y < h; y++) put(hx + w, hy + y, PAL.deep1);
+      }
+    }
+}
 
 // ── ground styles ───────────────────────────────────────────────────────────
 

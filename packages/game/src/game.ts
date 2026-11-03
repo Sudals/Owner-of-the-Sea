@@ -115,7 +115,12 @@ export class Game {
 
   /** 로비로 / 종료 (design §11-2): with unsaved progress, ask 저장하고 / 저장 안 하고 / 취소. */
   leave(kind: "lobby" | "quit"): void {
-    const go = () => (kind === "lobby" ? this.toTitle() : this.quit?.());
+    const go = () => {
+      // saved (or nothing to save): leaving must not write the world back and look unsaved again
+      if (this.remote) this.frozen = true;
+      if (kind === "lobby") this.toTitle();
+      else this.quit?.();
+    };
     if (!this.hasUnsaved()) return go();
     const what = kind === "quit" ? "종료" : "나가기";
     this.engine.modal = new Modal({

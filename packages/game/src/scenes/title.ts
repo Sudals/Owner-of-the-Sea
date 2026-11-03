@@ -160,6 +160,8 @@ export class TitleScene implements Scene {
   }
 
   private firstEnabled(): number {
+    // no save on this device: most players want 새 게임 (이어하기 by code is still one step up)
+    if (this.state.k === "menu" && !this.profile) return 1;
     const i = this.items().findIndex((it) => it.enabled !== false);
     return Math.max(0, i);
   }

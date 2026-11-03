@@ -113,8 +113,14 @@ const pendingCasts = j ? Object.values(j.pending).flat().length : 0;
 check("unsaved casts are journaled to userData", pendingCasts === 2, `${pendingCasts} pending`);
 
 // ── 3. hard kill → restart → offered back → saved ──
-app.process().kill("SIGKILL");
-await new Promise((r) => setTimeout(r, 1500));
+// a real hard kill: the whole process tree, no chance to save (child.kill() doesn't end Electron on Windows)
+const pid = app.process().pid;
+const { execFileSync } = await import("node:child_process");
+const alive = () => { try { return execFileSync("tasklist", ["/FI", `PID eq ${pid}`, "/NH"], { encoding: "utf8" }).includes(String(pid)); } catch { return false; } };
+try { execFileSync("taskkill", ["/PID", String(pid), "/T", "/F"], { stdio: "ignore" }); } catch { /* already gone */ }
+for (let i = 0; i < 20 && alive(); i++) await new Promise((r) => setTimeout(r, 200));
+check("the first instance is really gone (hard kill)", !alive(), `pid ${pid}`);
+await new Promise((r) => setTimeout(r, 800));
 ({ app, page } = await launch());
 let v = await waitFor(page, (s) => !!s.modal, 8000, "recovery");
 check("after a hard kill the journal is offered back", v.modal === "복구");
@@ -140,7 +146,13 @@ check("저장하고 종료 saves and quits", true);
 const j2 = existsSync(journal) ? JSON.parse(readFileSync(journal, "utf8")) : null;
 check("nothing left unsaved in the journal", !!j2 && Object.keys(j2.pending).length === 0 && !j2.dirty);
 
-rmSync(userData, { recursive: true, force: true });
+// Electron can hold userData files for a moment after quitting
+await new Promise((r) => setTimeout(r, 1000));
+try {
+  rmSync(userData, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 });
+} catch {
+  console.log(`     (could not remove ${userData}; it is only test data)`);
+}
 if (errors.length) {
   failed++;
   console.error(`${errors.length} console/page error(s):\n${errors.join("\n")}`);
