@@ -1,0 +1,29 @@
+# Neon
+.neon
+
+# dependencies
+node_modules/
+
+# env (secrets) — .env.example is committed
+.env
+.env.local
+.env*.local
+
+# next.js
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+
+# test output
+test-results/
+playwright-report/
+screenshots/
+
+# misc
+.DS_Store
+Thumbs.db
+*.log
+
+# sprite review renders (regenerate with `pnpm sprites`)
+packages/sprites/preview/

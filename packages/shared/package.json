@@ -1,0 +1,21 @@
+{
+  "name": "@sea/shared",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Client/server shared code: zod API schemas, static game data, seeded RNG",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./schemas": "./src/schemas/index.ts",
+    "./data": "./src/data/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^4"
+  },
+  "devDependencies": {
+    "typescript": "^6"
+  }
+}

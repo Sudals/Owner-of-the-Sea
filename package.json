@@ -1,0 +1,18 @@
+{
+  "name": "owner-of-the-sea",
+  "private": true,
+  "description": "바다의 주인 — 2D 도트 낚시 게임 (web demo + Electron) monorepo",
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @sea/api dev",
+    "build": "pnpm -r run build",
+    "typecheck": "pnpm -r run typecheck",
+    "sprites": "pnpm --filter @sea/sprites sprites",
+    "db:generate": "pnpm --filter @sea/api db:generate",
+    "db:migrate": "pnpm --filter @sea/api db:migrate",
+    "deploy:api": "pnpm --filter @sea/api deploy"
+  }
+}
