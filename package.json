@@ -18,10 +18,16 @@
     "db:generate": "pnpm --filter @sea/api db:generate",
     "db:migrate": "pnpm --filter @sea/api db:migrate",
     "deploy:api": "pnpm --filter @sea/api deploy",
+    "balance:check": "tsx scripts/balance.mts check",
+    "balance:apply": "tsx scripts/balance.mts apply",
     "desktop": "pnpm --filter @sea/client build && pnpm --filter @sea/desktop start",
     "dist:win": "pnpm --filter @sea/desktop dist:win"
   },
   "devDependencies": {
-    "playwright": "1.64.1"
+    "@types/pg": "^8.23.1",
+    "jsonc-parser": "3.3.1",
+    "pg": "^8.23.1",
+    "playwright": "1.64.1",
+    "tsx": "4.23.15"
   }
 }

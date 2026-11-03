@@ -1,5 +1,5 @@
 import {
-  dockNear, FUEL, fuelMax, FRESH_SECONDS, HULLS, IMPACT, ISLANDS, Kind, MAP_H, MAP_W, mapPoints, nearestIsland, pointNear, POINT_BY_ID, POINT_RADIUS,
+  DOCK_RADIUS, dockNear, FUEL, freshnessPct, fuelMax, holdCap, HULLS, IMPACT, impactDamage, isOpen, ISLANDS, Kind, stormDamagePerSec, towLossRate, MAP_H, MAP_W, mapPoints, nearestIsland, pointNear, POINT_BY_ID, POINT_RADIUS,
   seaBlock, seaGrid, SEA_NAME, stormIntensity, stormsAt, TILE, tileAt, type Island, type MapPoint,
 } from "@sea/shared";
 import type { LutName } from "@sea/sprites/palette";
@@ -56,6 +56,8 @@ export class SeaScene implements Scene {
   private saveT = 0;
   private revealT = 0;
   private hitCooldown = 0;
+  /** Storm damage below one whole HP, carried over. */
+  private stormWear = 0;
   private wake: Wake[] = [];
   private wakeT = 0;
   private toast: { text: string; until: number; color?: string } | null = null;
@@ -78,7 +80,7 @@ export class SeaScene implements Scene {
 
   private get gear() {
     const w = this.game.world;
-    return { hullLv: w.hullLv, lantern: w.lantern, fuelTank: w.fuelTank };
+    return { hullLv: w.hullLv, lantern: w.lantern, tankLv: w.tankLv };
   }
 
   private persist(): void {
@@ -108,7 +110,11 @@ export class SeaScene implements Scene {
     }
     if (s.k === "towed") {
       s.t += dt;
-      if (s.t > 2.6) this.game.toIsland(s.island.id, { towed: true, lost: s.lost, arrived: true });
+      if (s.t > 2.6) {
+        // Economy.md §4-6: full repair + 50% towing fee at that island, down to 0G (no debt)
+        const r = this.game.backend.trade({ kind: "tow", island: s.island.id, t: Date.now() });
+        this.game.toIsland(s.island.id, { towed: true, lost: s.lost, fee: r.ok ? -r.gold : 0, arrived: true });
+      }
       return;
     }
 
@@ -262,6 +268,16 @@ export class SeaScene implements Scene {
       });
     }
 
+    // ── storms wear the hull down (Economy.md §4-6: ~3% of max HP a minute at the eye) ──
+    if (this.storm > 0.2) {
+      this.stormWear += stormDamagePerSec(w.hullLv, this.storm) * dt;
+      if (this.stormWear >= 1) {
+        const n = Math.floor(this.stormWear);
+        this.stormWear -= n;
+        w.hullHp = Math.max(0, w.hullHp - n);
+      }
+    }
+
     // ── chart, hull, autosave ──
     this.revealT += dt;
     if (this.revealT > 0.25) {
@@ -301,9 +317,9 @@ export class SeaScene implements Scene {
       }
       return 0;
     }
-    // shore / reef: slide along it if we can, take damage for a hard hit
+    // shore / reef: slide along it if we can; a hard hit costs a share of max HP (Economy.md §4-6)
     if (impact > IMPACT.minSpeed && this.hitCooldown <= 0) {
-      const dmg = Math.round((impact - IMPACT.minSpeed) * IMPACT.perSpeed * (hit === "reef" ? IMPACT.reefMult : 1));
+      const dmg = impactDamage(this.game.world.hullLv, impact, hit === "reef");
       if (dmg > 0) {
         this.game.world.hullHp = Math.max(0, this.game.world.hullHp - dmg);
         this.hitCooldown = 0.6;
@@ -355,15 +371,14 @@ export class SeaScene implements Scene {
     return null;
   }
 
-  /** Hull at 0: towed to the nearest island, losing part of the hold (design §3-3). */
+  /** Hull at 0: towed to the nearest open village, losing part of the hold (Economy.md §4-6).
+   *  The fee is paid there on arrival (the tow trade). */
   private towed(): void {
     const hold = this.game.backend.hold();
-    const lose = Math.floor(hold.length * 0.3);
+    const lose = Math.floor(hold.length * towLossRate());
     const idx = hold.map((_, i) => i).sort(() => Math.random() - 0.5).slice(0, lose);
     if (lose) this.game.backend.dropHold(idx);
-    const w = this.game.world;
-    w.hullHp = Math.round(HULLS[w.hullLv].hp * 0.5);
-    const island = nearestIsland(this.boat.x, this.boat.y);
+    const island = nearestIsland(this.boat.x, this.boat.y, isOpen);
     this.boat.vx = this.boat.vy = this.boat.speed = 0;
     this.state = { k: "towed", t: 0, island, lost: lose };
   }
@@ -415,11 +430,11 @@ export class SeaScene implements Scene {
     const w = this.game.world;
     for (let i = 0; i < input.hit("KeyH"); i++) {
       w.hullLv = ((w.hullLv % 4) + 1) as 1 | 2 | 3 | 4;
-      w.fuelTank = w.hullLv >= 3;
+      w.tankLv = w.hullLv >= 3 ? 2 : 1;
       w.lantern = w.hullLv >= 4;
       w.hullHp = HULLS[w.hullLv].hp;
       w.fuel = fuelMax(w);
-      this.say(`[dev] 선체 Lv${w.hullLv}${w.fuelTank ? " · 연료통" : ""}${w.lantern ? " · 등불" : ""}`);
+      this.say(`[dev] 선체 Lv${w.hullLv}${w.tankLv >= 2 ? " · 연료통 Lv2" : ""}${w.lantern ? " · 등불" : ""}`);
     }
     if (input.hit("KeyF")) w.fuel = fuelMax(w);
     if (input.hit("KeyT")) this.game.clock.advance(input.hit("KeyT"));
@@ -470,6 +485,7 @@ export class SeaScene implements Scene {
     this.drawStorms(ctx, cam);
     this.drawTint(ctx);
     this.drawLabels(ctx, cam); // after the tint: names stay readable at night
+    this.drawDocks(ctx, cam);
     this.drawHud(ctx, engine, lut);
 
     if (this.state.k === "towed") {
@@ -581,6 +597,50 @@ export class SeaScene implements Scene {
     }
   }
 
+  /** Every island's dock: an anchor and the ring you must be inside to tie up, plus an arrow to
+   *  the dock when you're near the island but on the wrong side of it. */
+  private drawDocks(ctx: CanvasRenderingContext2D, cam: { x: number; y: number }): void {
+    const bx = this.boat.x, by = this.boat.y;
+    let nearest: { isl: (typeof ISLANDS)[number]; d: number } | null = null;
+    for (const isl of ISLANDS) {
+      const dxp = (isl.dock[0] + 0.5) * TILE, dyp = (isl.dock[1] + 0.5) * TILE;
+      const dIsl = Math.hypot(bx / TILE - isl.cx, by / TILE - isl.cy);
+      if (dIsl > 20) continue;
+      const cx = Math.round(dxp - cam.x), cy = Math.round(dyp - cam.y);
+      const inside = Math.hypot(bx - dxp, by - dyp) <= DOCK_RADIUS * TILE;
+      if (!nearest || dIsl < nearest.d) nearest = { isl, d: dIsl };
+      // dashed ring with a dark edge, so it reads on pale jade and on dark ink alike (yellow inside)
+      const R = DOCK_RADIUS * TILE;
+      const n = 40;
+      for (const [col, off] of [[lutHex("ink"), 1], [inside ? lutHex("yellow") : lutHex("white"), 0]] as const) {
+        ctx.fillStyle = col;
+        for (let k = 0; k < n; k++) {
+          if ((k + Math.floor(this.t * 3)) % 3 === 2) continue;
+          const a = (k / n) * Math.PI * 2;
+          ctx.fillRect(Math.round(cx + Math.cos(a) * R) - 1 + off, Math.round(cy + Math.sin(a) * R) - 1 + off, 2, 2);
+        }
+      }
+      drawAnchor(ctx, cx, cy - 1 + Math.round(Math.sin(this.t * 2) * 1), inside ? lutHex("yellow") : lutHex("white"));
+    }
+    // near an island but outside its dock ring: point the way
+    if (nearest && nearest.d < 14 && this.prompt?.kind !== "dock" && this.state.k === "sail") {
+      const isl = nearest.isl;
+      const dxp = (isl.dock[0] + 0.5) * TILE - bx, dyp = (isl.dock[1] + 0.5) * TILE - by;
+      const len = Math.hypot(dxp, dyp);
+      if (len > DOCK_RADIUS * TILE) {
+        const ux = dxp / len, uy = dyp / len;
+        // a bold arrow just off the bow side of the boat, pointing at the dock
+        const ax = bx - cam.x + ux * 24, ay = by - cam.y + uy * 24;
+        for (const [col, off] of [[lutHex("ink"), 1], [lutHex("yellow"), 0]] as const) {
+          ctx.fillStyle = col;
+          for (let s = 0; s < 10; s++) ctx.fillRect(Math.round(ax + ux * s) - 1 + off, Math.round(ay + uy * s) - 1 + off, 2, 2);
+          for (const side of [-1, 1]) for (let s = 1; s <= 4; s++) ctx.fillRect(Math.round(ax + ux * (9 - s) - uy * s * side) - 1 + off, Math.round(ay + uy * (9 - s) + ux * s * side) - 1 + off, 2, 2);
+        }
+        if (!this.prompt) text(ctx, `${isl.name} 부두(닻 표시)로 가면 접안할 수 있어요`, 320, 306, { align: "center", color: lutHex("yellow") });
+      }
+    }
+  }
+
   private drawLabels(ctx: CanvasRenderingContext2D, cam: { x: number; y: number }): void {
     for (const isl of ISLANDS) {
       const d = Math.hypot(this.boat.x / TILE - isl.cx, this.boat.y / TILE - isl.cy);
@@ -684,15 +744,14 @@ export class SeaScene implements Scene {
     button(ctx, assets, "normal", "해도 M", HUD_CHART.x, HUD_CHART.y, HUD_CHART.w, HUD_CHART.h);
     button(ctx, assets, "normal", "메뉴", HUD_MENU.x, HUD_MENU.y, HUD_MENU.w, HUD_MENU.h);
 
-    // hold + freshness
+    // hold + freshness + gold
     const hold = this.game.backend.hold();
-    let holdLine = "창고 비어 있음";
+    let holdLine = `창고 0/${holdCap(w.holdLv)}`;
     if (hold.length) {
-      const span = FRESH_SECONDS[Math.min(FRESH_SECONDS.length - 1, w.iceLv)]!;
-      const fresh = hold.reduce((s, h) => s + Math.max(0, 1 - (w.seaTime - (h.freshAt ?? w.seaTime)) / span), 0) / hold.length;
-      holdLine = `창고 ${hold.length}마리 · 신선도 ${Math.round(fresh * 100)}%`;
+      const fresh = hold.reduce((s, h) => s + freshnessPct(h, w.seaTime, w.iceLv), 0) / hold.length;
+      holdLine = `창고 ${hold.length}/${holdCap(w.holdLv)} · 신선도 ${Math.round(fresh)}%`;
     }
-    text(ctx, `${w.day}일차 · ${HULLS[w.hullLv].name} Lv${w.hullLv} · ${holdLine}`, 6, 344, { color: lutHex("foam2") });
+    text(ctx, `${w.day}일차 · ${HULLS[w.hullLv].name} · ${holdLine} · ${this.game.backend.gold().toLocaleString("ko-KR")}G`, 6, 344, { color: lutHex("foam2") });
 
     if (this.storm > 0.2 && Math.floor(this.t * 2) % 2 === 0) text(ctx, "폭풍 속 — 파도가 배를 민다 · 희귀종이 잘 문다", 320, 30, { align: "center", color: lutHex("yellow") });
 
@@ -730,6 +789,17 @@ const TINT: Partial<Record<LutName, { color: string; alpha: number; mode: Global
   ],
   night: [{ color: "#28366e", alpha: 0.8, mode: "multiply" }],
 };
+
+/** A small pixel anchor (7×9) centered on (cx, cy), with a dark shadow so it reads on any water. */
+function drawAnchor(ctx: CanvasRenderingContext2D, cx: number, cy: number, color: string): void {
+  const rows = ["..XXX..", "..X.X..", "..XXX..", "XXXXXXX", "...X...", "...X...", "X..X..X", ".X.X.X.", "..XXX.."];
+  for (const [col, off] of [[lutHex("ink"), 1], [color, 0]] as const) {
+    ctx.fillStyle = col;
+    rows.forEach((r, y) => {
+      for (let x = 0; x < r.length; x++) if (r[x] === "X") ctx.fillRect(cx - 3 + x + off, cy - 4 + y + off, 1, 1);
+    });
+  }
+}
 
 function wrapAngle(a: number): number {
   while (a > Math.PI) a -= Math.PI * 2;

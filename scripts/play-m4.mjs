@@ -117,6 +117,7 @@ const tok = await token();
 check(`새 게임 "${name}" registers on the server and keeps a device token`, !!tok && calls.includes("POST /auth/start"), calls.join(", "));
 
 // ── 2. fish three times with no server calls, then save once ──
+await page.evaluate(() => window.__sea.engine.currentScene.focus("fish"));
 await key("Enter"); // 선착장에서 낚시
 v = await waitFor((s) => s.k === "idle", 15_000, "fishing");
 check("the dock session comes from the server", calls.includes("POST /session/open"));
@@ -152,6 +153,7 @@ await key("Enter");
 await waitFor((s) => !s.modal, 5000, "prompt closed");
 await key("Enter"); // 이어하기
 await waitFor((s) => s.k === "island", 15_000, "island again");
+await page.evaluate(() => window.__sea.engine.currentScene.focus("fish"));
 await key("Enter");
 v = await waitFor((s) => s.k === "idle", 15_000, "fishing again");
 check("the session resumes at the last saved cast", v.session?.next === 3, `next cast ${v.session?.next}`);
@@ -174,6 +176,7 @@ check("복구하고 저장 puts the crashed casts in the DB", calls.includes("PO
 // ── 5. leaving with unsaved progress asks first ──
 await key("Enter"); // 이어하기
 await waitFor((s) => s.k === "island", 15_000, "island 3");
+await page.evaluate(() => window.__sea.engine.currentScene.focus("fish"));
 await key("Enter");
 await waitFor((s) => s.k === "idle", 15_000, "fishing 3");
 const last = await fishOnce();

@@ -1,7 +1,9 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { apiError, internalError } from "./http";
+import { latestBalance } from "./logic/config";
 import { authRoutes } from "./routes/auth";
+import { configRoutes } from "./routes/config";
 import { healthRoutes } from "./routes/health";
 import { meRoutes } from "./routes/me";
 import { saveRoutes } from "./routes/save";
@@ -29,9 +31,16 @@ app.use(
   }),
 );
 
+// the game rules every route reads (balance.jsonc as applied to the DB; cached 30 s)
+app.use("*", async (_c, next) => {
+  await latestBalance().catch((e) => console.warn("[config] keeping the loaded balance:", e instanceof Error ? e.message : e));
+  await next();
+});
+
 app.get("/", (c) => c.json({ name: "바다의 주인 API", branch: process.env.NEON_BRANCH ?? null }));
 app.route("/auth", authRoutes);
 app.route("/me", meRoutes);
+app.route("/config", configRoutes);
 app.route("/session", sessionRoutes);
 app.route("/save", saveRoutes);
 app.route("/health", healthRoutes);

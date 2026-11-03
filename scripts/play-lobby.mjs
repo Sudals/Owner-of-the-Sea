@@ -124,6 +124,7 @@ check("Space does not submit the name", v.k === "name");
 await page.keyboard.press("Enter");
 v = await waitFor((x) => x.k === "island");
 check("Enter starts the game as 바다사람, tied up at 빨간등대", v.profile?.name === "바다사람" && v.island === "red_lighthouse", v.profile?.name);
+await page.evaluate(() => window.__sea.engine.currentScene.focus("fish"));
 await page.keyboard.press("Enter"); // 선착장에서 낚시
 v = await waitFor((x) => x.scene === "fishing" && x.k === "idle");
 const seed = v.seed;
@@ -159,6 +160,7 @@ check("after reload: lobby, focus on 이어하기", v.scene === "title" && v.sel
 check("settings survived the reload", v.settings.bgm === 9 && v.settings.sfx === 6);
 await page.keyboard.press("Enter");
 v = await waitFor((x) => x.k === "island");
+await page.evaluate(() => window.__sea.engine.currentScene.focus("fish"));
 await page.keyboard.press("Enter"); // back to the same dock
 v = await waitFor((x) => x.scene === "fishing" && x.k === "idle");
 check("이어하기 resumes the same seed and cast index", v.seed === seed && v.nextIndex === nextIndex, `${v.seed?.slice(0, 8)}… #${v.nextIndex} vs ${seed?.slice(0, 8)}… #${nextIndex}`);

@@ -2,6 +2,7 @@
 // (odds.ts) decide the grade and size. Sea points are scattered on the top-down map
 // (seaMap.ts → MAP_POINTS); every island also has a dock point for shore fishing.
 
+import { balance, derived, live } from "../balance";
 import type { OddsMod } from "./odds";
 import { ISLANDS } from "./seaMap";
 
@@ -20,38 +21,26 @@ export type FishingPoint = {
   deep?: boolean;
 };
 
-/** Open-water species per sea. */
-const SEA_POOL: Readonly<Record<SeaColor, readonly string[]>> = {
-  jade: ["anchovy", "sardine", "halfbeak", "mackerel", "horse_mackerel", "mullet", "pufferfish", "herring", "black_seabream", "needlefish", "sea_bass", "koi", "red_seabream", "golden_seabream"],
-  azure: ["mackerel", "saury", "filefish", "conger", "horse_mackerel", "sea_bass", "spanish_mackerel", "yellowtail", "opaleye", "red_seabream", "striped_beakfish", "salmon", "golden_seabream"],
-  indigo: ["cutlassfish", "greenling", "scorpionfish", "skipjack", "yellowtail", "moray", "opaleye", "salmon", "bluefin_tuna", "sunfish", "ghost_cutlass"],
-  ink: ["dark_rockfish", "scorpionfish", "cutlassfish", "anglerfish", "pike_conger", "moray", "lantern_angler", "sunfish", "ghost_cutlass"],
-};
 
-/** Shore species per sea (dock fishing). */
-const DOCK_POOL: Readonly<Record<SeaColor, readonly string[]>> = {
-  jade: ["anchovy", "sardine", "gizzard_shad", "goby", "filefish", "halfbeak", "rockfish", "pufferfish", "grass_puffer", "black_seabream", "porcupinefish", "red_seabream", "koi", "golden_seabream"],
-  azure: ["mackerel", "saury", "filefish", "conger", "horse_mackerel", "greenling", "sea_bass", "opaleye", "red_seabream", "striped_beakfish", "golden_seabream"],
-  indigo: ["cutlassfish", "greenling", "scorpionfish", "rockfish", "moray", "catfish", "opaleye", "salmon", "sunfish", "ghost_cutlass"],
-  ink: ["dark_rockfish", "scorpionfish", "pike_conger", "anglerfish", "catfish", "lantern_angler", "ghost_cutlass"],
-};
 
-/** Shallow shore water: fewer rare and big fish than open water. */
-const DOCK_ODDS: OddsMod = { grade: { rare: 0.8, legendary: 0.5 }, size: { A: 0.8, S: 0.6 } };
 
 const SEA_POINT_NAME: Readonly<Record<SeaColor, string>> = { jade: "옥빛 여울", azure: "청빛 물골", indigo: "남빛 낭떠러지", ink: "먹빛 골짜기" };
 
-export const POINTS: readonly FishingPoint[] = [
-  ...ISLANDS.map((i): FishingPoint => ({ id: i.dockPoint, name: `${i.name} 선착장`, kind: "dock", sea: i.sea, pool: DOCK_POOL[i.sea], odds: DOCK_ODDS })),
-  ...(Object.keys(SEA_POOL) as SeaColor[]).map((sea): FishingPoint => ({ id: `${sea}_1`, name: SEA_POINT_NAME[sea], kind: "sea", sea, pool: SEA_POOL[sea], deep: sea === "ink" })),
-];
+/** Dock points (one per island) and open-water points (one pool per sea), from balance.jsonc
+ *  `fishing.pools`; shallow shore water uses `fishing.dockOdds`. */
+export const POINTS: readonly FishingPoint[] = live(
+  derived((b) => {
+    const dockOdds: OddsMod = b.fishing.dockOdds;
+    const seas = Object.keys(b.fishing.pools.sea) as SeaColor[];
+    return [
+      ...ISLANDS.map((i): FishingPoint => ({ id: i.dockPoint, name: `${i.name} 선착장`, kind: "dock", sea: i.sea, pool: b.fishing.pools.dock[i.sea], odds: dockOdds })),
+      ...seas.map((sea): FishingPoint => ({ id: `${sea}_1`, name: SEA_POINT_NAME[sea], kind: "sea", sea, pool: b.fishing.pools.sea[sea], deep: sea === "ink" })),
+    ];
+  }),
+  [],
+);
 
-export const POINT_BY_ID: Readonly<Record<string, FishingPoint>> = Object.fromEntries(POINTS.map((p) => [p.id, p]));
+export const POINT_BY_ID: Readonly<Record<string, FishingPoint>> = live(derived(() => Object.fromEntries(POINTS.map((p) => [p.id, p]))));
 
 /** Pollutant boss per sea color (design §4-5: tier follows the sea). */
-export const POLLUTANT_BY_SEA: Readonly<Record<SeaColor, string>> = {
-  jade: "plastic_mullet",
-  azure: "oil_mackerel_king",
-  indigo: "net_shark",
-  ink: "drum_whale",
-};
+export const POLLUTANT_BY_SEA: Readonly<Record<SeaColor, string>> = live(() => balance().fishing.pollutantBySea);

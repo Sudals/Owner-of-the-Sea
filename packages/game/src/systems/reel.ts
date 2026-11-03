@@ -7,6 +7,8 @@
 //  · tension ≥ 1 → the line snaps · tension ~0 for 1.5 s → the fish shakes loose · distance 0 → caught
 //  · rod level = reel speed, line level = tension headroom; bosses pull ×2.5 over ×3 distance (§4-5)
 
+import { balance, lineMax, live, rodSpeed } from "@sea/shared";
+
 export type ReelOutcome = "caught" | "snapped" | "escaped";
 
 export type ReelParams = {
@@ -19,17 +21,8 @@ export type ReelParams = {
   castPower?: number;
 };
 
-export const REEL = {
-  slackLimit: 1.5,
-  holdRise: 0.25, // tension/s while reeling, before the fish pulls
-  pullRise: 0.5, // extra tension/s per unit of fish pull
-  releaseFall: 0.9, // tension/s shed when you let go…
-  minFall: 0.3, // …never less than this, even against a strong fish
-  bossMult: 2.0, // design §4-5: bosses pull ×2~3
-  baseSpeed: 3.2, // m/s at rod Lv1
-  speedPerRod: 0.6,
-  headroomPerLine: 0.15,
-} as const;
+/** Tension-game constants, from balance.jsonc `reel` (always the current balance). */
+export const REEL: Readonly<{ slackLimit: number; holdRise: number; pullRise: number; releaseFall: number; minFall: number; bossMult: number; baseSpeed: number }> = live(() => balance().reel);
 
 export class Reel {
   dist: number;
@@ -58,8 +51,8 @@ export class Reel {
     const boss = p.boss ? 1 : 0;
     this.strength = (p.power / 10) * (boss ? REEL.bossMult : 1);
     this.stamina = (6 + p.power * 1.4) * (boss ? 1.6 : 1);
-    this.speed = REEL.baseSpeed + REEL.speedPerRod * ((p.rodLv ?? 1) - 1);
-    this.headroom = 1 + REEL.headroomPerLine * ((p.lineLv ?? 1) - 1);
+    this.speed = REEL.baseSpeed * rodSpeed(p.rodLv ?? 1);
+    this.headroom = lineMax(p.lineLv ?? 1);
     this.startDist = (6 + (p.castPower ?? 0.5) * 10) * (boss ? 3 : 1);
     this.dist = this.startDist;
     this.phase = rnd() * Math.PI * 2;

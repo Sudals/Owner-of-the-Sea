@@ -1,5 +1,9 @@
-import type { CastRecord, FishingSession, GameBackend, Gear, HoldItem, Profile, SaveOutcome, SaveReason, SaveStatus, SessionSpot, WorldState } from "@sea/game";
-import type { AuthResponse, HoldItemDto, OpenSessionResponse, SaveRequest, SaveResponse, WorldDto } from "@sea/shared";
+import type { CastRecord, DexEntry, FishingSession, GameBackend, Gear, HoldItem, Inventory, Profile, SaveOutcome, SaveReason, SaveStatus, SessionSpot, WorldState } from "@sea/game";
+import {
+  balanceSchema, balanceVersion, BARE_HOOK, emptyLog, normalizeLog, setBalance,
+  type AuthResponse, type Balance, type DexEntryDto, type HoldItemDto, type MarketLog, type OpenSessionResponse, type OpResult, type SaveRequest, type SaveResponse, type ShopOp, type WorldDto,
+} from "@sea/shared";
+import { castOn, tradeOn } from "./ledger";
 import { journalStore, tokenStore, type KeyValueStore } from "./stores";
 
 // Full-build backend (design §7, §11): the server decides, but is called rarely.
@@ -18,10 +22,17 @@ type Journal = {
   v: 1;
   profile: Profile | null;
   /** Last state the server confirmed. */
-  base: { world: WorldState; hold: HoldItem[]; gear: Gear } | null;
+  base: { world: WorldState; hold: HoldItem[]; gear: Gear; gold: number; dex: DexEntry[]; inventory: Inventory; marketLog: MarketLog } | null;
   /** Live state (the game mutates `world` in place). */
   world: WorldState | null;
   hold: HoldItem[];
+  gear: Gear | null;
+  gold: number;
+  dex: DexEntry[];
+  inventory: Inventory;
+  marketLog: MarketLog;
+  /** Trades since the last save, in order (the server re-applies them). */
+  ops: ShopOp[];
   sessions: Record<string, Sess>; // by sessionId
   /** Casts not yet saved, by sessionId. */
   pending: Record<string, CastRecord[]>;
@@ -31,7 +42,36 @@ type Journal = {
   lastSavedAt: number | null;
 };
 
-const freshJournal = (): Journal => ({ v: 1, profile: null, base: null, world: null, hold: [], sessions: {}, pending: {}, dirty: false, inflight: null, lastSavedAt: null });
+const freshJournal = (): Journal => ({
+  v: 1,
+  profile: null,
+  base: null,
+  world: null,
+  hold: [],
+  gear: null,
+  gold: 0,
+  dex: [],
+  inventory: {},
+  marketLog: emptyLog(),
+  ops: [],
+  sessions: {},
+  pending: {},
+  dirty: false,
+  inflight: null,
+  lastSavedAt: null,
+});
+
+/** Journals written before M5 lack the bait and market fields (and the tank/hold levels). */
+function upgrade(j: Journal): Journal {
+  j.inventory ??= {};
+  j.marketLog = normalizeLog(j.marketLog);
+  for (const w of [j.world, j.base?.world]) if (w) Object.assign(w, { tankLv: w.tankLv ?? 1, holdLv: w.holdLv ?? 1 });
+  if (j.base) {
+    j.base.inventory ??= {};
+    j.base.marketLog = normalizeLog(j.base.marketLog);
+  }
+  return j;
+}
 
 class ApiError extends Error {
   constructor(
@@ -45,11 +85,14 @@ class ApiError extends Error {
 const OFFLINE = "서버에 연결할 수 없어요. 인터넷 연결을 확인해 주세요.";
 
 const toWorld = (w: WorldDto): WorldState => ({ ...w, hullLv: w.hullLv as WorldState["hullLv"] });
+const toInventory = (inv: Record<string, number>): Inventory => ({ ...inv }) as Inventory;
 const toHold = (h: HoldItemDto[]): HoldItem[] => h.map((x) => ({ ...x }));
 
 export class RemoteBackend implements GameBackend {
   private j: Journal;
   private worldVersion = 0;
+  /** Older balance versions a fishing session opened under (GET /api/config?version=N). */
+  private balances = new Map<number, Balance>();
 
   private constructor(
     private readonly apiBase: string,
@@ -70,8 +113,27 @@ export class RemoteBackend implements GameBackend {
     } catch {
       saved = null;
     }
-    const b = new RemoteBackend(apiBase.replace(/\/$/, ""), tokens, journal, token, saved?.v === 1 ? saved : null);
+    const b = new RemoteBackend(apiBase.replace(/\/$/, ""), tokens, journal, token, saved?.v === 1 ? upgrade(saved) : null);
+    // the game's numbers as the server has them (balance.jsonc → DB); offline, the bundled ones
+    await b.loadBalance().catch((e) => console.warn("[remote] using the bundled balance", e));
     if (token) await b.refresh().catch((e) => console.warn("[remote] start offline", e));
+    return b;
+  }
+
+  /** GET /api/config → make it the balance the game runs on. */
+  private async loadBalance(): Promise<void> {
+    const r = await this.api<{ version: number; data: unknown }>("GET", "/config");
+    if (r.version !== balanceVersion()) setBalance(r.data, r.version);
+  }
+
+  /** A pinned older version, for a session that opened under it. */
+  private async balanceAt(version: number): Promise<Balance | undefined> {
+    if (version === balanceVersion()) return undefined;
+    const hit = this.balances.get(version);
+    if (hit) return hit;
+    const r = await this.api<{ version: number; data: unknown }>("GET", `/config?version=${version}`);
+    const b = balanceSchema.parse(r.data);
+    this.balances.set(version, b);
     return b;
   }
 
@@ -125,7 +187,7 @@ export class RemoteBackend implements GameBackend {
 
   /** GET /api/me → the confirmed state. Unsaved local progress is kept (it may be recovered). */
   private async refresh(): Promise<void> {
-    type Me = { account: { name: string; createdAt: string }; world: WorldDto; hold: HoldItemDto[]; gear: Gear };
+    type Me = { account: { name: string; createdAt: string }; world: WorldDto; hold: HoldItemDto[]; gear: Gear; gold: number; dex: DexEntryDto[]; inventory: Record<string, number>; marketLog: MarketLog };
     let me: Me;
     try {
       me = await this.api<Me>("GET", "/me");
@@ -139,11 +201,8 @@ export class RemoteBackend implements GameBackend {
     }
     const prev = this.j.profile;
     this.j.profile = { name: me.account.name, createdAt: me.account.createdAt, lastPlayedAt: prev?.lastPlayedAt ?? new Date().toISOString(), recoveryCode: prev?.recoveryCode ?? null };
-    this.j.base = { world: toWorld(me.world), hold: toHold(me.hold), gear: me.gear };
-    if (!this.hasUnsaved()) {
-      this.j.world = structuredClone(this.j.base.world);
-      this.j.hold = structuredClone(this.j.base.hold);
-    }
+    this.j.base = { world: toWorld(me.world), hold: toHold(me.hold), gear: me.gear, gold: me.gold, dex: me.dex, inventory: toInventory(me.inventory ?? {}), marketLog: normalizeLog(me.marketLog) };
+    if (!this.hasUnsaved()) this.resetToBase();
     this.persist();
   }
 
@@ -158,18 +217,28 @@ export class RemoteBackend implements GameBackend {
       // left and came back before the next save: the server still has it open — same seed
       mine.closed = false;
       this.persist();
-      return this.toFishing(mine);
+      return this.toFishing(mine, await this.pinned(mine));
     }
     const r = await this.api<OpenSessionResponse>("POST", "/session/open", { spotId: spot.spotId, at: spot.at, clockH: spot.clockH });
     const known = this.j.sessions[r.sessionId];
     const s: Sess = { ...r, savedIndex: r.nextIndex, nextIndex: Math.max(r.nextIndex, known?.nextIndex ?? 0), openedAt: now, closed: false };
     this.j.sessions[r.sessionId] = s;
     this.persist();
-    return this.toFishing(s);
+    return this.toFishing(s, await this.pinned(s));
   }
 
-  private toFishing(s: Sess): FishingSession {
-    return { sessionId: s.sessionId, seed: s.seed, spotId: s.spotId, nextIndex: s.nextIndex, omenFrom: s.omenFrom, conds: s.conds };
+  /** The balance a session's casts must roll with when it isn't the loaded one. */
+  private async pinned(s: Sess): Promise<Balance | undefined> {
+    const v = s.configVersion ?? 0;
+    return this.balanceAt(v).catch((e) => {
+      // offline with an unknown version: roll with what we have; the save will flag a mismatch
+      console.warn("[remote] balance version", v, e);
+      return undefined;
+    });
+  }
+
+  private toFishing(s: Sess, balance?: Balance): FishingSession {
+    return { sessionId: s.sessionId, seed: s.seed, spotId: s.spotId, nextIndex: s.nextIndex, omenFrom: s.omenFrom, conds: s.conds, ...(balance ? { balance } : {}) };
   }
 
   recordCast(sessionId: string, cast: CastRecord): void {
@@ -177,8 +246,7 @@ export class RemoteBackend implements GameBackend {
     if (!s) return;
     s.nextIndex = Math.max(s.nextIndex, cast.i + 1);
     (this.j.pending[sessionId] ??= []).push(cast);
-    if (cast.result === "caught")
-      this.j.hold.push({ id: `${sessionId}:${cast.i}`, fishId: cast.fishId, sizeCm: cast.sizeCm, spotId: s.spotId, caughtAt: new Date(cast.t).toISOString(), freshAt: cast.seaT });
+    castOn(this.j, sessionId, s.spotId, cast, this.world().seaTime);
     this.persist();
   }
 
@@ -190,7 +258,50 @@ export class RemoteBackend implements GameBackend {
   }
 
   gear(): Gear {
-    return this.j.base?.gear ?? { rodLv: 1, lineLv: 1 };
+    return (this.j.gear ??= structuredClone(this.j.base?.gear ?? { rodLv: 1, lineLv: 1 }));
+  }
+
+  gold(): number {
+    return this.j.gold;
+  }
+
+  dex(): DexEntry[] {
+    return this.j.dex;
+  }
+
+  inventory(): Inventory {
+    return this.j.inventory;
+  }
+
+  marketLog(): MarketLog {
+    return this.j.marketLog;
+  }
+
+  trade(op: ShopOp): OpResult {
+    const st = { gold: this.j.gold, hold: this.j.hold, inventory: this.j.inventory, gear: this.gear(), world: this.world(), log: this.j.marketLog };
+    const r = tradeOn(st, op);
+    if (r.ok) {
+      Object.assign(this.j, { gold: st.gold, hold: st.hold, inventory: st.inventory, marketLog: st.log });
+      this.j.ops.push(op);
+      this.j.dirty = true;
+      this.worldVersion++;
+      this.persist();
+    }
+    return r;
+  }
+
+  /** Live state := the last confirmed state. */
+  private resetToBase(): void {
+    const base = this.j.base;
+    if (!base) return;
+    if (this.j.world) Object.assign(this.j.world, structuredClone(base.world));
+    else this.j.world = structuredClone(base.world);
+    this.j.hold = structuredClone(base.hold);
+    this.j.gear = structuredClone(base.gear);
+    this.j.gold = base.gold;
+    this.j.dex = structuredClone(base.dex);
+    this.j.inventory = structuredClone(base.inventory);
+    this.j.marketLog = structuredClone(base.marketLog);
   }
 
   hold(): HoldItem[] {
@@ -234,11 +345,8 @@ export class RemoteBackend implements GameBackend {
       s.nextIndex = s.savedIndex;
       s.closed = false;
     }
-    if (this.j.base) {
-      if (this.j.world) Object.assign(this.j.world, structuredClone(this.j.base.world));
-      else this.j.world = structuredClone(this.j.base.world);
-      this.j.hold = structuredClone(this.j.base.hold);
-    }
+    this.j.ops = [];
+    this.resetToBase();
     this.j.dirty = false;
     this.persist();
   }
@@ -262,7 +370,7 @@ export class RemoteBackend implements GameBackend {
     const sessions = Object.values(this.j.sessions)
       .filter((s) => (this.j.pending[s.sessionId]?.length ?? 0) > 0 || s.closed)
       .map((s) => ({ sessionId: s.sessionId, sig: s.sig, casts: [...(this.j.pending[s.sessionId] ?? [])], closed: s.closed }));
-    if (!sessions.length && !this.j.dirty) return null;
+    if (!sessions.length && !this.j.dirty && !this.j.ops.length) return null;
     const w = this.world();
     return {
       batchId: crypto.randomUUID(),
@@ -270,6 +378,7 @@ export class RemoteBackend implements GameBackend {
       sessions,
       world: { at: w.at, hullHp: w.hullHp, fuel: w.fuel, day: w.day, hour: w.hour, seaTime: w.seaTime, chart: w.chart },
       holdIds: this.j.hold.map((h) => h.id).filter((x): x is string => !!x),
+      ops: [...this.j.ops],
     };
   }
 
@@ -313,16 +422,32 @@ export class RemoteBackend implements GameBackend {
       s.nextIndex = Math.max(r.nextIndex, ...later);
     }
     const confirmed = toWorld(res.world);
-    this.j.base = { world: confirmed, hold: toHold(res.hold), gear: res.gear };
+    this.j.base = { world: confirmed, hold: toHold(res.hold), gear: res.gear, gold: res.gold, dex: res.dex, inventory: toInventory(res.inventory), marketLog: normalizeLog(res.marketLog) };
+    // the server's gold, gear and 도감 are the truth; trades made while this save was in the air
+    // are applied again on top of them below
+    const laterOps = this.j.ops.slice(body.ops.length);
+    this.j.gold = res.gold;
+    this.j.gear = structuredClone(res.gear);
+    this.j.dex = structuredClone(res.dex);
+    this.j.inventory = toInventory(res.inventory);
+    this.j.marketLog = normalizeLog(res.marketLog);
     const w = this.world();
     if (version === this.worldVersion) Object.assign(w, structuredClone(confirmed));
-    else Object.assign(w, { hullLv: confirmed.hullLv, fuelTank: confirmed.fuelTank, lantern: confirmed.lantern, iceLv: confirmed.iceLv });
-    // hold = confirmed + catches recorded after this batch was built
+    else Object.assign(w, { hullLv: confirmed.hullLv, tankLv: confirmed.tankLv, holdLv: confirmed.holdLv, lantern: confirmed.lantern, iceLv: confirmed.iceLv });
+    // hold = confirmed + catches recorded after this batch was built; their bait is used up again
+    const later = Object.values(this.j.pending).flat();
     const unsent = new Set(Object.entries(this.j.pending).flatMap(([sid, cs]) => cs.filter((c) => c.result === "caught").map((c) => `${sid}:${c.i}`)));
     this.j.hold = [...toHold(res.hold), ...this.j.hold.filter((h) => h.id && unsent.has(h.id))];
-    this.j.dirty = version !== this.worldVersion;
+    for (const c of later) {
+      const bait = (c.bait ?? "bait_worm") as keyof Inventory;
+      if (c.bait !== BARE_HOOK && c.bit !== false) this.j.inventory[bait] = Math.max(0, (this.j.inventory[bait] ?? 0) - 1);
+    }
+    this.j.ops = [];
+    for (const op of laterOps) this.trade(op);
+    this.j.dirty = version !== this.worldVersion || laterOps.length > 0;
     this.j.inflight = null;
     this.j.lastSavedAt = Date.now();
+    if (res.configVersion !== balanceVersion()) void this.loadBalance().catch(() => undefined); // retuned while we played
     this.persist();
   }
 
@@ -331,7 +456,7 @@ export class RemoteBackend implements GameBackend {
   }
 
   private hasUnsaved(): boolean {
-    return this.j.dirty || this.hasPendingCasts() || !!this.j.inflight;
+    return this.j.dirty || this.hasPendingCasts() || !!this.j.inflight || this.j.ops.length > 0;
   }
 
   private persist(): void {
@@ -362,5 +487,5 @@ export class RemoteBackend implements GameBackend {
 
 /** Only used if the server state never arrived (offline first start) — same as a new player. */
 function fallbackWorld(): WorldState {
-  return { at: { kind: "island", id: "red_lighthouse" }, hullLv: 1, hullHp: 100, fuel: 100, fuelTank: false, lantern: false, iceLv: 0, day: 1, hour: 9, seaTime: 0, chart: "" };
+  return { at: { kind: "island", id: "red_lighthouse" }, hullLv: 1, hullHp: 100, fuel: 100, tankLv: 1, holdLv: 1, lantern: false, iceLv: 0, day: 1, hour: 9, seaTime: 0, chart: "" };
 }

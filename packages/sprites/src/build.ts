@@ -8,7 +8,7 @@ import { buildBoatTop } from "./sprites/boatTop";
 import { buildProps } from "./sprites/props";
 import { buildUi } from "./sprites/ui";
 import { Img } from "./lib/image";
-import { BG_H, BG_W, DOCK, HORIZON, lutVariants, renderDock, renderSea, SEAS, WATERLINE } from "./sprites/backgrounds";
+import { BG_H, BG_W, DOCK, DOCK_LOOKS, HORIZON, lutVariants, renderDock, renderSea, SEAS, WATERLINE, type DockLook } from "./sprites/backgrounds";
 import { writeFileSync } from "node:fs";
 import { buildFish, FISH } from "./sprites/fish";
 import { appIcon, BOSS_META, buildOwner, buildPollutants, buildSky } from "./sprites/pollutants";
@@ -60,8 +60,9 @@ for (const g of groups) {
 if (!only || only === "bg") {
   const seas = SEAS.map((sea) => ({ sea, img: renderSea(sea) }));
   for (const { sea, img } of seas) writePng(`${OUT}/bg_sea_${sea}.png`, img);
-  const dock = renderDock();
-  writePng(`${OUT}/bg_dock.png`, dock);
+  const docks = (Object.keys(DOCK_LOOKS) as DockLook[]).map((look) => renderDock(look));
+  (Object.entries(DOCK_LOOKS) as [DockLook, string][]).forEach(([, name], i) => writePng(`${OUT}/${name}.png`, docks[i]!));
+  const dock = docks[0]!;
   writeFileSync(`${OUT}/bg_meta.json`, JSON.stringify({ size: [BG_W, BG_H], horizon: HORIZON, waterline: WATERLINE, dock: DOCK, seas: SEAS }, null, 1));
   writePng(`${PREVIEW}/bg_dock.png`, dock, 2);
   const grid2 = (imgs: Img[], cols: number) => {
@@ -72,6 +73,7 @@ if (!only || only === "bg") {
   };
   writePng(`${PREVIEW}/bg_seas.png`, grid2(seas.map((s) => s.img), 2));
   writePng(`${PREVIEW}/bg_luts_jade.png`, grid2(lutVariants(seas[0]!.img).map((v) => v.img), 3));
+  writePng(`${PREVIEW}/bg_docks.png`, grid2(docks, 2));
   console.log(`bg            ${seas.length} seas  → bg_sea_*.png (640×360)`);
 }
 

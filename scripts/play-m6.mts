@@ -226,9 +226,8 @@ check("새 게임 starts tied up at 빨간등대", v.island === "red_lighthouse"
 await page.waitForTimeout(300);
 await shot("m6-island");
 
-await page.keyboard.press("ArrowDown"); // 출항
-await page.waitForTimeout(50);
-await page.keyboard.press("Enter");
+await page.evaluate(() => (window as any).__sea.engine.currentScene.focus("sail"));
+await page.keyboard.press("Enter"); // 출항
 const t0 = Date.now();
 v = await waitFor((x) => x.scene === "SeaScene" && x.k === "sail", 15_000, "sea");
 console.log(`     sea map ready in ${Date.now() - t0} ms`);
@@ -255,7 +254,7 @@ v = await waitFor((x) => !x.target, 20_000, "click arrival");
 check("click-to-sail moves toward the spot", v.boat!.x > before.x + 100, `moved ${Math.round(v.boat!.x - before.x)} px`);
 
 // ── 4. Lv1 can't enter 청빛 바다 ──
-const lv1: Gear = { hullLv: 1, lantern: false, fuelTank: false };
+const lv1: Gear = { hullLv: 1, lantern: false, tankLv: 1 };
 {
   // the nearest azure tile from here, then try to sail straight into it
   let best: Pt | null = null, bestD = 1e9;
@@ -351,14 +350,13 @@ await page.keyboard.press("KeyF"); // dev: refuel
 }
 
 // ── 8. the long voyage: 빨간등대 → 검은등대 (dev: hull Lv4 + 연료통 + 등불) ──
-await page.keyboard.press("ArrowDown");
-await page.waitForTimeout(50);
+await page.evaluate(() => (window as any).__sea.engine.currentScene.focus("sail"));
 await page.keyboard.press("Enter"); // 출항
 await waitFor((x) => x.scene === "SeaScene" && x.k === "sail", 10_000, "sea again");
 for (let i = 0; i < 3; i++) await page.keyboard.press("KeyH"); // Lv1 → Lv4
 v = await waitFor((x) => x.world.hullLv === 4, 2000, "hull Lv4").catch(() => view());
 check("dev H: hull Lv4 with lantern + tank", v.world.hullLv === 4);
-const lv4: Gear = { hullLv: 4, lantern: true, fuelTank: true };
+const lv4: Gear = { hullLv: 4, lantern: true, tankLv: 2 };
 const dest = ISLAND_BY_ID.black_lighthouse!;
 const destApproach = nearestRoomy(dest.dock[0], dest.dock[1], lv4);
 const voyage = route(pxOf(v), destApproach, lv4);
@@ -387,8 +385,7 @@ await page.waitForTimeout(300);
 await shot("m6-black-lighthouse");
 
 // ── 9. storms ──
-await page.keyboard.press("ArrowDown");
-await page.waitForTimeout(50);
+await page.evaluate(() => (window as any).__sea.engine.currentScene.focus("sail"));
 await page.keyboard.press("Enter"); // 출항
 v = await waitFor((x) => x.scene === "SeaScene" && x.k === "sail", 10_000, "sea for storm");
 {

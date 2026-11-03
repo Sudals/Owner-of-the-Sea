@@ -1,0 +1,1468 @@
+{
+ "fish": {
+  "anchovy": {
+   "name": "멸치",
+   "grade": "common",
+   "sizeCm": [
+    6,
+    15
+   ],
+   "power": 1,
+   "erratic": 0.2,
+   "price": 1.01
+  },
+  "sardine": {
+   "name": "정어리",
+   "grade": "common",
+   "sizeCm": [
+    12,
+    25
+   ],
+   "power": 1.5,
+   "erratic": 0.2,
+   "price": 0.99
+  },
+  "gizzard_shad": {
+   "name": "전어",
+   "grade": "common",
+   "sizeCm": [
+    15,
+    30
+   ],
+   "power": 2,
+   "erratic": 0.3,
+   "price": 1.04
+  },
+  "herring": {
+   "name": "청어",
+   "grade": "common",
+   "sizeCm": [
+    20,
+    40
+   ],
+   "power": 2,
+   "erratic": 0.2,
+   "price": 1.08
+  },
+  "goby": {
+   "name": "망둥어",
+   "grade": "common",
+   "sizeCm": [
+    8,
+    20
+   ],
+   "power": 1,
+   "erratic": 0.4,
+   "price": 0.81
+  },
+  "red_seabream": {
+   "name": "참돔",
+   "grade": "rare",
+   "sizeCm": [
+    30,
+    90
+   ],
+   "power": 6,
+   "erratic": 0.4,
+   "price": 1.05
+  },
+  "black_seabream": {
+   "name": "감성돔",
+   "grade": "uncommon",
+   "sizeCm": [
+    25,
+    55
+   ],
+   "power": 5,
+   "erratic": 0.5,
+   "price": 0.95
+  },
+  "striped_beakfish": {
+   "name": "돌돔",
+   "grade": "rare",
+   "sizeCm": [
+    25,
+    60
+   ],
+   "power": 7,
+   "erratic": 0.5,
+   "price": 1.14
+  },
+  "filefish": {
+   "name": "쥐치",
+   "grade": "common",
+   "sizeCm": [
+    15,
+    35
+   ],
+   "power": 3,
+   "erratic": 0.5,
+   "price": 1
+  },
+  "opaleye": {
+   "name": "벵에돔",
+   "grade": "uncommon",
+   "sizeCm": [
+    25,
+    50
+   ],
+   "power": 5,
+   "erratic": 0.6,
+   "price": 1.1
+  },
+  "koi": {
+   "name": "비단잉어",
+   "grade": "rare",
+   "sizeCm": [
+    40,
+    90
+   ],
+   "power": 4,
+   "erratic": 0.3,
+   "price": 0.84
+  },
+  "golden_seabream": {
+   "name": "황금 참돔",
+   "grade": "legendary",
+   "sizeCm": [
+    60,
+    110
+   ],
+   "power": 9.5,
+   "erratic": 0.7,
+   "price": 0.88
+  },
+  "saury": {
+   "name": "꽁치",
+   "grade": "common",
+   "sizeCm": [
+    25,
+    40
+   ],
+   "power": 2,
+   "erratic": 0.3,
+   "price": 1.14
+  },
+  "halfbeak": {
+   "name": "학공치",
+   "grade": "common",
+   "sizeCm": [
+    25,
+    40
+   ],
+   "power": 2,
+   "erratic": 0.5,
+   "price": 0.8
+  },
+  "needlefish": {
+   "name": "동갈치",
+   "grade": "uncommon",
+   "sizeCm": [
+    50,
+    100
+   ],
+   "power": 4,
+   "erratic": 0.7,
+   "price": 1.11
+  },
+  "mackerel": {
+   "name": "고등어",
+   "grade": "common",
+   "sizeCm": [
+    25,
+    45
+   ],
+   "power": 3,
+   "erratic": 0.5,
+   "price": 0.8
+  },
+  "horse_mackerel": {
+   "name": "전갱이",
+   "grade": "common",
+   "sizeCm": [
+    20,
+    40
+   ],
+   "power": 3,
+   "erratic": 0.4,
+   "price": 0.87
+  },
+  "mullet": {
+   "name": "숭어",
+   "grade": "common",
+   "sizeCm": [
+    30,
+    70
+   ],
+   "power": 4,
+   "erratic": 0.4,
+   "price": 1.19
+  },
+  "sea_bass": {
+   "name": "농어",
+   "grade": "uncommon",
+   "sizeCm": [
+    40,
+    100
+   ],
+   "power": 6,
+   "erratic": 0.5,
+   "price": 1.13
+  },
+  "salmon": {
+   "name": "연어",
+   "grade": "rare",
+   "sizeCm": [
+    50,
+    90
+   ],
+   "power": 7,
+   "erratic": 0.4,
+   "price": 0.97
+  },
+  "spanish_mackerel": {
+   "name": "삼치",
+   "grade": "uncommon",
+   "sizeCm": [
+    50,
+    100
+   ],
+   "power": 6,
+   "erratic": 0.4,
+   "price": 1.03
+  },
+  "yellowtail": {
+   "name": "방어",
+   "grade": "uncommon",
+   "sizeCm": [
+    50,
+    110
+   ],
+   "power": 7,
+   "erratic": 0.4,
+   "price": 1.2
+  },
+  "skipjack": {
+   "name": "가다랑어",
+   "grade": "uncommon",
+   "sizeCm": [
+    40,
+    80
+   ],
+   "power": 6,
+   "erratic": 0.3,
+   "price": 1.19
+  },
+  "bluefin_tuna": {
+   "name": "참다랑어",
+   "grade": "rare",
+   "sizeCm": [
+    100,
+    250
+   ],
+   "power": 10,
+   "erratic": 0.3,
+   "price": 0.97
+  },
+  "conger": {
+   "name": "붕장어",
+   "grade": "common",
+   "sizeCm": [
+    40,
+    100
+   ],
+   "power": 4,
+   "erratic": 0.6,
+   "price": 0.99
+  },
+  "moray": {
+   "name": "곰치",
+   "grade": "uncommon",
+   "sizeCm": [
+    60,
+    150
+   ],
+   "power": 6,
+   "erratic": 0.7,
+   "price": 1.13
+  },
+  "pike_conger": {
+   "name": "갯장어",
+   "grade": "uncommon",
+   "sizeCm": [
+    60,
+    150
+   ],
+   "power": 5,
+   "erratic": 0.6,
+   "price": 0.95
+  },
+  "cutlassfish": {
+   "name": "갈치",
+   "grade": "common",
+   "sizeCm": [
+    60,
+    150
+   ],
+   "power": 4,
+   "erratic": 0.4,
+   "price": 0.83
+  },
+  "ghost_cutlass": {
+   "name": "유령 갈치",
+   "grade": "legendary",
+   "sizeCm": [
+    120,
+    200
+   ],
+   "power": 9,
+   "erratic": 0.85,
+   "price": 1.17,
+   "deep": true
+  },
+  "pufferfish": {
+   "name": "복어",
+   "grade": "common",
+   "sizeCm": [
+    15,
+    35
+   ],
+   "power": 2,
+   "erratic": 0.6,
+   "price": 1.08
+  },
+  "grass_puffer": {
+   "name": "졸복",
+   "grade": "common",
+   "sizeCm": [
+    10,
+    20
+   ],
+   "power": 1,
+   "erratic": 0.6,
+   "price": 1.05
+  },
+  "porcupinefish": {
+   "name": "가시복",
+   "grade": "uncommon",
+   "sizeCm": [
+    20,
+    45
+   ],
+   "power": 3,
+   "erratic": 0.6,
+   "price": 1.2
+  },
+  "sunfish": {
+   "name": "개복치",
+   "grade": "rare",
+   "sizeCm": [
+    100,
+    300
+   ],
+   "power": 9,
+   "erratic": 0.1,
+   "price": 1.15
+  },
+  "rockfish": {
+   "name": "우럭",
+   "grade": "common",
+   "sizeCm": [
+    20,
+    50
+   ],
+   "power": 4,
+   "erratic": 0.3,
+   "price": 1.16
+  },
+  "scorpionfish": {
+   "name": "쏨뱅이",
+   "grade": "common",
+   "sizeCm": [
+    15,
+    30
+   ],
+   "power": 3,
+   "erratic": 0.4,
+   "price": 1.11
+  },
+  "greenling": {
+   "name": "쥐노래미",
+   "grade": "common",
+   "sizeCm": [
+    20,
+    50
+   ],
+   "power": 4,
+   "erratic": 0.4,
+   "price": 0.89
+  },
+  "dark_rockfish": {
+   "name": "볼락",
+   "grade": "common",
+   "sizeCm": [
+    15,
+    30
+   ],
+   "power": 3,
+   "erratic": 0.3,
+   "price": 0.87
+  },
+  "catfish": {
+   "name": "메기",
+   "grade": "uncommon",
+   "sizeCm": [
+    40,
+    100
+   ],
+   "power": 5,
+   "erratic": 0.3,
+   "price": 1.12
+  },
+  "anglerfish": {
+   "name": "아귀",
+   "grade": "uncommon",
+   "sizeCm": [
+    40,
+    100
+   ],
+   "power": 5,
+   "erratic": 0.2,
+   "price": 1.19,
+   "deep": true
+  },
+  "lantern_angler": {
+   "name": "초롱아귀",
+   "grade": "rare",
+   "sizeCm": [
+    20,
+    40
+   ],
+   "power": 4,
+   "erratic": 0.5,
+   "price": 0.88,
+   "deep": true
+  },
+  "plastic_mullet": {
+   "name": "비닐감긴 숭어",
+   "grade": "boss",
+   "tier": "C",
+   "sizeCm": [
+    60,
+    90
+   ],
+   "power": 6,
+   "erratic": 0.7,
+   "price": 1
+  },
+  "oil_mackerel_king": {
+   "name": "기름먹은 고등어떼왕",
+   "grade": "boss",
+   "tier": "B",
+   "sizeCm": [
+    60,
+    100
+   ],
+   "power": 7,
+   "erratic": 0.8,
+   "price": 1
+  },
+  "net_shark": {
+   "name": "그물을 끄는 상어",
+   "grade": "boss",
+   "tier": "A",
+   "sizeCm": [
+    200,
+    400
+   ],
+   "power": 9,
+   "erratic": 0.8,
+   "price": 1
+  },
+  "drum_whale": {
+   "name": "드럼통 고래",
+   "grade": "boss",
+   "tier": "S",
+   "sizeCm": [
+    800,
+    1200
+   ],
+   "power": 10,
+   "erratic": 0.6,
+   "price": 1
+  }
+ },
+ "fishing": {
+  "waitSec": [
+   2,
+   8
+  ],
+  "biteWindowSec": 0.6,
+  "zoneOdds": {
+   "jade": {
+    "grade": {
+     "common": 78,
+     "uncommon": 17,
+     "rare": 4.6,
+     "legendary": 0.4
+    },
+    "size": {
+     "D": 40,
+     "C": 30,
+     "B": 18,
+     "A": 9,
+     "S": 3
+    }
+   },
+   "azure": {
+    "grade": {
+     "common": 62,
+     "uncommon": 27,
+     "rare": 10,
+     "legendary": 1
+    },
+    "size": {
+     "D": 34,
+     "C": 30,
+     "B": 20,
+     "A": 12,
+     "S": 4
+    }
+   },
+   "indigo": {
+    "grade": {
+     "common": 48,
+     "uncommon": 33,
+     "rare": 16,
+     "legendary": 3
+    },
+    "size": {
+     "D": 28,
+     "C": 28,
+     "B": 22,
+     "A": 16,
+     "S": 6
+    }
+   },
+   "ink": {
+    "grade": {
+     "common": 38,
+     "uncommon": 36,
+     "rare": 21,
+     "legendary": 5
+    },
+    "size": {
+     "D": 22,
+     "C": 26,
+     "B": 24,
+     "A": 20,
+     "S": 8
+    }
+   }
+  },
+  "sizeBands": {
+   "D": [
+    0,
+    0.35
+   ],
+   "C": [
+    0.35,
+    0.6
+   ],
+   "B": [
+    0.6,
+    0.8
+   ],
+   "A": [
+    0.8,
+    0.93
+   ],
+   "S": [
+    0.93,
+    1
+   ]
+  },
+  "dockOdds": {
+   "grade": {
+    "rare": 0.8,
+    "legendary": 0.5
+   },
+   "size": {
+    "A": 0.8,
+    "S": 0.6
+   }
+  },
+  "deepTileBonus": {
+   "grade": {
+    "rare": 1.5,
+    "legendary": 2
+   },
+   "size": {
+    "A": 1.5,
+    "S": 2
+   }
+  },
+  "stormBonus": {
+   "grade": {
+    "rare": 1.4,
+    "legendary": 1.6
+   }
+  },
+  "pools": {
+   "sea": {
+    "jade": [
+     "anchovy",
+     "sardine",
+     "halfbeak",
+     "mackerel",
+     "horse_mackerel",
+     "mullet",
+     "pufferfish",
+     "herring",
+     "black_seabream",
+     "needlefish",
+     "sea_bass",
+     "koi",
+     "red_seabream",
+     "golden_seabream"
+    ],
+    "azure": [
+     "mackerel",
+     "saury",
+     "filefish",
+     "conger",
+     "horse_mackerel",
+     "sea_bass",
+     "spanish_mackerel",
+     "yellowtail",
+     "opaleye",
+     "red_seabream",
+     "striped_beakfish",
+     "salmon",
+     "golden_seabream"
+    ],
+    "indigo": [
+     "cutlassfish",
+     "greenling",
+     "scorpionfish",
+     "skipjack",
+     "yellowtail",
+     "moray",
+     "opaleye",
+     "salmon",
+     "bluefin_tuna",
+     "sunfish",
+     "ghost_cutlass"
+    ],
+    "ink": [
+     "dark_rockfish",
+     "scorpionfish",
+     "cutlassfish",
+     "anglerfish",
+     "pike_conger",
+     "moray",
+     "lantern_angler",
+     "sunfish",
+     "ghost_cutlass"
+    ]
+   },
+   "dock": {
+    "jade": [
+     "anchovy",
+     "sardine",
+     "gizzard_shad",
+     "goby",
+     "filefish",
+     "halfbeak",
+     "rockfish",
+     "pufferfish",
+     "grass_puffer",
+     "black_seabream",
+     "porcupinefish",
+     "red_seabream",
+     "koi",
+     "golden_seabream"
+    ],
+    "azure": [
+     "mackerel",
+     "saury",
+     "filefish",
+     "conger",
+     "horse_mackerel",
+     "greenling",
+     "sea_bass",
+     "opaleye",
+     "red_seabream",
+     "striped_beakfish",
+     "golden_seabream"
+    ],
+    "indigo": [
+     "cutlassfish",
+     "greenling",
+     "scorpionfish",
+     "rockfish",
+     "moray",
+     "catfish",
+     "opaleye",
+     "salmon",
+     "sunfish",
+     "ghost_cutlass"
+    ],
+    "ink": [
+     "dark_rockfish",
+     "scorpionfish",
+     "pike_conger",
+     "anglerfish",
+     "catfish",
+     "lantern_angler",
+     "ghost_cutlass"
+    ]
+   }
+  },
+  "pollutantBySea": {
+   "jade": "plastic_mullet",
+   "azure": "oil_mackerel_king",
+   "indigo": "net_shark",
+   "ink": "drum_whale"
+  },
+  "bait": {
+   "bait_worm": {},
+   "bait_shrimp": {
+    "waitMul": 0.6
+   },
+   "bait_lure": {
+    "grade": {
+     "uncommon": 1.5,
+     "rare": 2
+    }
+   },
+   "bait_big": {
+    "size": {
+     "A": 1.5,
+     "S": 2
+    }
+   },
+   "bait_glow": {
+    "grade": {
+     "rare": 1.5,
+     "legendary": 3
+    },
+    "onlyDeep": true
+   },
+   "bait_black": {
+    "grade": {
+     "uncommon": 1.3,
+     "rare": 2,
+     "legendary": 2
+    },
+    "size": {
+     "A": 1.5,
+     "S": 2
+    },
+    "rot": 1.5
+   },
+   "none": {
+    "waitMul": 1.5
+   }
+  }
+ },
+ "reel": {
+  "slackLimit": 1.5,
+  "holdRise": 0.25,
+  "pullRise": 0.5,
+  "releaseFall": 0.9,
+  "minFall": 0.3,
+  "bossMult": 2,
+  "baseSpeed": 3.2,
+  "rodSpeed": [
+   1,
+   1.15,
+   1.3,
+   1.45,
+   1.6
+  ],
+  "lineMax": [
+   1,
+   1.2,
+   1.4,
+   1.65,
+   1.9
+  ]
+ },
+ "boat": {
+  "hulls": {
+   "1": {
+    "name": "통통배",
+    "hp": 100,
+    "speed": 66,
+    "radius": 5
+   },
+   "2": {
+    "name": "흰 통통배",
+    "hp": 150,
+    "speed": 78,
+    "radius": 5
+   },
+   "3": {
+    "name": "철선",
+    "hp": 220,
+    "speed": 90,
+    "radius": 6
+   },
+   "4": {
+    "name": "큰 철선",
+    "hp": 300,
+    "speed": 104,
+    "radius": 7
+   }
+  },
+  "tankCap": {
+   "1": 100,
+   "2": 200,
+   "3": 350
+  },
+  "fuelPerTile": 0.45,
+  "rowFactor": 0.3,
+  "impact": {
+   "minSpeed": 18,
+   "reefPctAtTop": 0.1,
+   "shorePctAtTop": 0.05
+  },
+  "stormDamagePctPerMin": 0.03,
+  "freshDecayPerMin": [
+   1,
+   0.7,
+   0.5,
+   0.35
+  ],
+  "holdCap": {
+   "1": 20,
+   "2": 30,
+   "3": 45,
+   "4": 60
+  },
+  "towLossRate": 0.3
+ },
+ "economy": {
+  "start": {
+   "gold": 50,
+   "worms": 20
+  },
+  "basePrice": {
+   "common": {
+    "jade": 8,
+    "azure": 13,
+    "indigo": 21,
+    "ink": 32
+   },
+   "uncommon": {
+    "jade": 25,
+    "azure": 40,
+    "indigo": 65,
+    "ink": 100
+   },
+   "rare": {
+    "jade": 80,
+    "azure": 128,
+    "indigo": 208,
+    "ink": 320
+   },
+   "legendary": {
+    "jade": 300,
+    "azure": 480,
+    "indigo": 780,
+    "ink": 1200
+   }
+  },
+  "bossBasePrice": {
+   "C": 150,
+   "B": 400,
+   "A": 1000,
+   "S": 2500,
+   "SS": 5000
+  },
+  "sizeMult": {
+   "D": 0.7,
+   "C": 0.9,
+   "B": 1,
+   "A": 1.3,
+   "S": 1.8
+  },
+  "largeFromCm": 40,
+  "freshBands": [
+   {
+    "from": 80,
+    "name": "싱싱함",
+    "mult": 1
+   },
+   {
+    "from": 50,
+    "name": "보통",
+    "mult": 0.85
+   },
+   {
+    "from": 20,
+    "name": "시듦",
+    "mult": 0.6
+   },
+   {
+    "from": 0,
+    "name": "상함",
+    "mult": 0.2
+   }
+  ],
+  "saltedMult": 0.9,
+  "demand": {
+   "freeCount": 20,
+   "stepPerFish": 0.015,
+   "floor": 0.7,
+   "recoverMinPerFish": 3,
+   "steady": 20,
+   "short": 30
+  },
+  "fuelUnitPrice": 1,
+  "repairPerHp": {
+   "1": 0.5,
+   "2": 1,
+   "3": 1.5,
+   "4": 2
+  },
+  "repairKitPrice": {
+   "1": 20,
+   "2": 55,
+   "3": 125,
+   "4": 225
+  },
+  "towFeeRate": 0.5,
+  "openIslands": [
+   "red_lighthouse",
+   "water_market",
+   "salt_flower",
+   "bell_tower"
+  ],
+  "markets": {
+   "red_lighthouse": {
+    "buy": {
+     "small": 0.8,
+     "large": 0.8
+    },
+    "trashFlat": 2,
+    "volatility": 0,
+    "specials": 0,
+    "specialMult": 1,
+    "items": 1,
+    "shop": [],
+    "fuel": null,
+    "repair": 0.5,
+    "dailyWorms": 20,
+    "keeper": "덕배 할멈",
+    "line": "네 할아비 배는 동네 사람들이랑 반값에 고쳐 주마. 물고기도 좀 사 주지."
+   },
+   "water_market": {
+    "buy": {
+     "small": 1.15,
+     "large": 1.1,
+     "deep": 1.05,
+     "relic": 0.8,
+     "polluted": 1
+    },
+    "trashFlat": 2,
+    "volatility": 0.08,
+    "specials": 1,
+    "specialMult": 1.5,
+    "items": 1,
+    "shop": [
+     "bait_worm",
+     "bait_shrimp",
+     "rod_2",
+     "line_2",
+     "hold_2"
+    ],
+    "fuel": 1,
+    "repair": 1,
+    "keeper": "말순",
+    "line": "바다? 값을 치르는 사람 거지. 우리 장터는 어느 날 와도 손해 안 봐."
+   },
+   "salt_flower": {
+    "buy": {
+     "small": 0.9,
+     "large": 0.9,
+     "deep": 0.9
+    },
+    "trashFlat": 3,
+    "volatility": 0.2,
+    "specials": 3,
+    "specialMult": 2,
+    "saltedFullPrice": true,
+    "items": 1,
+    "itemOverride": {
+     "bait_worm": 0.6,
+     "bait_shrimp": 0.6,
+     "salt": 0.6,
+     "ice_chunk": 0.6
+    },
+    "shop": [
+     "bait_worm",
+     "bait_shrimp",
+     "salt",
+     "ice_chunk",
+     "ice_1",
+     "ice_2"
+    ],
+    "fuel": 1,
+    "repair": 1.1,
+    "keeper": "강노인",
+    "line": "바다는 땀 흘려 일하는 사람 거야. 소금에 절인 건 제값 쳐 주지."
+   },
+   "bell_tower": {
+    "buy": {
+     "small": 0.95,
+     "large": 0.85,
+     "relic": 0.7
+    },
+    "trashFlat": 3,
+    "volatility": 0.2,
+    "specials": 3,
+    "specialMult": 2,
+    "items": 0.9,
+    "shop": [
+     "rod_2",
+     "line_2",
+     "hull_2",
+     "bait_worm"
+    ],
+    "fuel": null,
+    "repair": 1,
+    "keeper": "아이 바다",
+    "line": "바다는 다 같이 쓰는 거 아냐? 근데 왜 다들 자기 거래?"
+   },
+   "bridge": {
+    "buy": {
+     "small": 1,
+     "large": 1,
+     "deep": 1,
+     "relic": 0.9,
+     "polluted": 1
+    },
+    "trashFlat": 2,
+    "volatility": 0.15,
+    "specials": 3,
+    "specialMult": 2,
+    "items": 1,
+    "shop": [
+     "rod_3",
+     "line_3",
+     "bait_lure",
+     "bait_shrimp",
+     "repair_kit"
+    ],
+    "fuel": 1.1,
+    "repair": 1,
+    "toll": 20,
+    "keeper": "문씨",
+    "line": "바다는 길을 가진 사람 것이지. 통행료는 스무 냥."
+   },
+   "junk": {
+    "buy": {
+     "small": 0.9,
+     "large": 0.9,
+     "deep": 0.9,
+     "relic": 1.3,
+     "polluted": 1
+    },
+    "trashFlat": 5,
+    "volatility": 0.1,
+    "specials": 1,
+    "specialMult": 2,
+    "items": 0.9,
+    "shop": [
+     "repair_kit",
+     "hold_3",
+     "bait_lure"
+    ],
+    "fuel": null,
+    "repair": 0.9,
+    "appraise": 20,
+    "keeper": "탁사장",
+    "line": "건져 올린 사람 거지, 먼저 줍는 놈이 임자."
+   },
+   "rusty_port": {
+    "buy": {
+     "small": 0.95,
+     "large": 1.15,
+     "deep": 1,
+     "relic": 1,
+     "polluted": 1
+    },
+    "trashFlat": 3,
+    "volatility": 0.15,
+    "specials": 3,
+    "specialMult": 2,
+    "items": 1,
+    "shop": [
+     "hull_3",
+     "tank_2",
+     "tank_3",
+     "repair_kit"
+    ],
+    "fuel": 0.7,
+    "repair": 0.6,
+    "keeper": "최반장",
+    "line": "태평호 선원들은 돈을 잘 벌었지. 뭘 싣고 나가는지는 아무도 안 물었고."
+   },
+   "whalebone": {
+    "buy": {
+     "small": 0.85,
+     "large": 1.3,
+     "deep": 1.1,
+     "relic": 0.9,
+     "polluted": 1
+    },
+    "trashFlat": 3,
+    "volatility": 0.15,
+    "specials": 3,
+    "specialMult": 2,
+    "items": 1.1,
+    "shop": [
+     "bait_big",
+     "bait_glow",
+     "bait_lure",
+     "line_4",
+     "ice_3"
+    ],
+    "fuel": 1,
+    "repair": 1,
+    "keeper": "고래뼈 사람들",
+    "line": "바다는 이미 죽은 것들의 것이야. 우린 그 위에 얹혀사는 거고."
+   },
+   "glass_tower": {
+    "buy": {
+     "small": 0.95,
+     "large": 1,
+     "deep": 1.2,
+     "relic": 1.4,
+     "polluted": 1.1
+    },
+    "volatility": 0.1,
+    "specials": 1,
+    "specialMult": 2,
+    "collector": 1.2,
+    "items": 1.5,
+    "shop": [
+     "hull_4",
+     "rod_4",
+     "rod_5",
+     "line_4",
+     "line_5",
+     "tank_3",
+     "hold_4",
+     "bait_glow"
+    ],
+    "fuel": 1.5,
+    "repair": 1.5,
+    "appraise": 40,
+    "keeper": "태평해운 사람들",
+    "line": "바다는 개발하는 자의 것."
+   },
+   "water_sound": {
+    "buy": {},
+    "volatility": 0,
+    "specials": 0,
+    "specialMult": 1,
+    "items": 1,
+    "shop": [],
+    "fuel": null,
+    "repair": null,
+    "keeper": "해월",
+    "line": "바다는 바다 것이다. 사람은 잠시 빌려 쓸 뿐이지."
+   },
+   "black_sand": {
+    "buy": {
+     "small": 0.7,
+     "large": 0.7,
+     "deep": 0.8,
+     "relic": 1.1,
+     "polluted": 1.4
+    },
+    "trashFlat": 4,
+    "volatility": 0.2,
+    "specials": 1,
+    "specialMult": 2,
+    "items": 1,
+    "itemOverride": {
+     "bait_glow": 1.2
+    },
+    "shop": [
+     "bait_black",
+     "bait_glow",
+     "repair_kit"
+    ],
+    "fuel": 1.3,
+    "repair": 1.2,
+    "keeper": "구렁이",
+    "line": "바다는 살아남는 놈 거야."
+   },
+   "black_lighthouse": {
+    "buy": {
+     "small": 1,
+     "large": 1,
+     "deep": 1.05,
+     "relic": 1,
+     "polluted": 1
+    },
+    "trashFlat": 2,
+    "volatility": 0,
+    "specials": 0,
+    "specialMult": 1,
+    "items": 1,
+    "shop": [
+     "bait_worm",
+     "bait_shrimp",
+     "bait_glow",
+     "salt",
+     "ice_chunk",
+     "repair_kit"
+    ],
+    "fuel": 1,
+    "repair": 1,
+    "keeper": "윤씨",
+    "line": "바다는… 글쎄다. 난 그 질문에 답할 자격이 없는 사람이야."
+   }
+  },
+  "items": {
+   "bait_worm": {
+    "kind": "bait",
+    "name": "지렁이",
+    "desc": "기본 미끼",
+    "price": 1,
+    "bundle": 20
+   },
+   "bait_shrimp": {
+    "kind": "bait",
+    "name": "새우 미끼",
+    "desc": "입질이 40% 빨리 온다",
+    "price": 2,
+    "bundle": 20
+   },
+   "bait_lure": {
+    "kind": "bait",
+    "name": "반짝이 루어",
+    "desc": "고급 ×1.5 · 희귀 ×2",
+    "price": 4,
+    "bundle": 20
+   },
+   "bait_big": {
+    "kind": "bait",
+    "name": "대형 미끼",
+    "desc": "크기 A급 ×1.5 · S급 ×2",
+    "price": 4,
+    "bundle": 20
+   },
+   "bait_glow": {
+    "kind": "bait",
+    "name": "발광 미끼",
+    "desc": "희귀 ×1.5 · 전설 ×3 (남빛·먹빛·심해 칸)",
+    "price": 25,
+    "bundle": 10
+   },
+   "bait_black": {
+    "kind": "bait",
+    "name": "검은 미끼",
+    "desc": "희귀·전설 ×2 · 큰 크기 ↑ · 빨리 상함",
+    "price": 40,
+    "bundle": 10
+   },
+   "rod_2": {
+    "kind": "rod",
+    "name": "낚싯대 Lv2",
+    "desc": "감기 속도 ×1.15",
+    "price": 300,
+    "level": 2
+   },
+   "rod_3": {
+    "kind": "rod",
+    "name": "낚싯대 Lv3",
+    "desc": "감기 속도 ×1.3",
+    "price": 1000,
+    "level": 3
+   },
+   "rod_4": {
+    "kind": "rod",
+    "name": "낚싯대 Lv4",
+    "desc": "감기 속도 ×1.45",
+    "price": 3500,
+    "level": 4
+   },
+   "rod_5": {
+    "kind": "rod",
+    "name": "낚싯대 Lv5",
+    "desc": "감기 속도 ×1.6",
+    "price": 10000,
+    "level": 5
+   },
+   "line_2": {
+    "kind": "line",
+    "name": "낚싯줄 Lv2",
+    "desc": "텐션 최대 120",
+    "price": 250,
+    "level": 2
+   },
+   "line_3": {
+    "kind": "line",
+    "name": "낚싯줄 Lv3",
+    "desc": "텐션 최대 140",
+    "price": 900,
+    "level": 3
+   },
+   "line_4": {
+    "kind": "line",
+    "name": "낚싯줄 Lv4",
+    "desc": "텐션 최대 165",
+    "price": 3000,
+    "level": 4
+   },
+   "line_5": {
+    "kind": "line",
+    "name": "낚싯줄 Lv5",
+    "desc": "텐션 최대 190",
+    "price": 8500,
+    "level": 5
+   },
+   "hull_2": {
+    "kind": "hull",
+    "name": "선체 Lv2",
+    "desc": "청빛 바다 · 내구도 150",
+    "price": 800,
+    "level": 2
+   },
+   "hull_3": {
+    "kind": "hull",
+    "name": "선체 Lv3",
+    "desc": "남빛 바다 · 내구도 220",
+    "price": 2500,
+    "level": 3
+   },
+   "hull_4": {
+    "kind": "hull",
+    "name": "선체 Lv4",
+    "desc": "먹빛 바다(등불 필요) · 내구도 300",
+    "price": 6000,
+    "level": 4
+   },
+   "tank_2": {
+    "kind": "tank",
+    "name": "연료통 Lv2",
+    "desc": "연료 최대 200 · 남빛 진입 조건",
+    "price": 1200,
+    "level": 2
+   },
+   "tank_3": {
+    "kind": "tank",
+    "name": "연료통 Lv3",
+    "desc": "연료 최대 350",
+    "price": 4000,
+    "level": 3
+   },
+   "ice_1": {
+    "kind": "ice",
+    "name": "얼음 창고 Lv1",
+    "desc": "신선도 감소 0.7%/분",
+    "price": 400,
+    "level": 1
+   },
+   "ice_2": {
+    "kind": "ice",
+    "name": "얼음 창고 Lv2",
+    "desc": "신선도 감소 0.5%/분",
+    "price": 1500,
+    "level": 2
+   },
+   "ice_3": {
+    "kind": "ice",
+    "name": "얼음 창고 Lv3",
+    "desc": "신선도 감소 0.35%/분",
+    "price": 5000,
+    "level": 3
+   },
+   "hold_2": {
+    "kind": "hold",
+    "name": "화물칸 Lv2",
+    "desc": "창고 30칸",
+    "price": 500,
+    "level": 2
+   },
+   "hold_3": {
+    "kind": "hold",
+    "name": "화물칸 Lv3",
+    "desc": "창고 45칸",
+    "price": 2000,
+    "level": 3
+   },
+   "hold_4": {
+    "kind": "hold",
+    "name": "화물칸 Lv4",
+    "desc": "창고 60칸",
+    "price": 6000,
+    "level": 4
+   },
+   "repair_kit": {
+    "kind": "consumable",
+    "name": "수리 키트",
+    "desc": "바다 위에서 내구도 25% 회복 · 최대 3개",
+    "price": 0,
+    "max": 3
+   },
+   "salt": {
+    "kind": "consumable",
+    "name": "소금",
+    "desc": "물고기 1마리 신선도 고정 · 판매가 ×0.9",
+    "price": 10
+   },
+   "ice_chunk": {
+    "kind": "consumable",
+    "name": "얼음 덩이",
+    "desc": "창고 전체 신선도 +10%p",
+    "price": 15
+   }
+  }
+ },
+ "scoring": {
+  "basePoints": {
+   "common": 10,
+   "uncommon": 30,
+   "rare": 100,
+   "legendary": 300
+  },
+  "trashPoints": 2,
+  "sizeMult": {
+   "D": 0.5,
+   "C": 0.8,
+   "B": 1,
+   "A": 1.4,
+   "S": 2
+  },
+  "seaMult": {
+   "jade": 1,
+   "azure": 1.5,
+   "indigo": 2,
+   "ink": 3
+  },
+  "weatherMult": {
+   "clear": 1,
+   "storm": 1.3
+  },
+  "bossScoreMult": {
+   "C": 10,
+   "B": 15,
+   "A": 25,
+   "S": 50
+  },
+  "omen": {
+   "firstThreshold": 1000,
+   "thresholdGrowth": 1.15,
+   "baseChance": 0.35,
+   "pityStep": 0.15,
+   "guaranteedWithinCasts": 3
+  }
+ }
+}

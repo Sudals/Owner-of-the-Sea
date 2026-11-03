@@ -1,6 +1,6 @@
 import {
-  deepField, depthAt, fbm, FLAG_RUINS, FLAG_VALLEY, ISLANDS, islandField, Kind, LAND, MAP_H, MAP_W,
-  ruinsField, RUINS_CUT, seaGrid, TILE, VALLEY, ZONE_CUTS, type Island, type Part,
+  deepField, depthAt, fbm, FLAG_VALLEY, ISLANDS, islandField, Kind, LAND, MAP_H, MAP_W,
+  seaGrid, TILE, VALLEY, ZONE_CUTS, type Island, type Part,
 } from "@sea/shared";
 import { C } from "@sea/sprites/palette";
 
@@ -13,11 +13,11 @@ import { C } from "@sea/sprites/palette";
 const PAL = { ...C };
 const TL = TILE, MW = MAP_W, MH = MAP_H;
 const LANDL = { ...LAND };
-const F_RUINS = FLAG_RUINS, F_VALLEY = FLAG_VALLEY, R_CUT = RUINS_CUT;
-const K_REEF = Kind.Reef, K_PIER = Kind.Pier, K_WATER = Kind.Water;
+const F_VALLEY = FLAG_VALLEY;
+const K_REEF = Kind.Reef, K_PIER = Kind.Pier;
 const ISL: Island[] = [...ISLANDS];
 const VAL = { ...VALLEY };
-const ruinsF = ruinsField, fbmF = fbm, islandF = islandField, depthF = depthAt, deepF = deepField;
+const fbmF = fbm, islandF = islandField, depthF = depthAt, deepF = deepField;
 const CUT_A = ZONE_CUTS[0], CUT_B = ZONE_CUTS[1], CUT_C = ZONE_CUTS[2];
 
 export const WORLD_W = MW * TL;
@@ -139,7 +139,6 @@ export function bakeSea(): Uint8Array {
   }
 
   const b: Bake = { out, W, H, landD, landIsl };
-  drawDrownedTown(b, g);
   drawUnderwater(b);
   drawTrees(b);
   drawReefs(b, g);
@@ -152,57 +151,24 @@ export function bakeSea(): Uint8Array {
 
 type Bake = { out: Uint8Array; W: number; H: number; landD: Float32Array; landIsl: Int8Array };
 
-/** 잠긴 마을 (design §3-3): roofs and streets of the drowned town under the jade water.
- *  Drawn as clean shapes one or two shades darker than the water around them — the water
- *  "tints" them — so they read as sunken houses, not as dithered stains. Each 3×2-tile block
- *  holds 0–2 houses (gable roof: north face, ridge, south face), with streets between. */
-function drawDrownedTown(b: Bake, g: ReturnType<typeof seaGrid>): void {
-  const BX = 3 * TL, BY = 2 * TL;
-  // [north face, south face, ridge]: mostly mossy teal, now and then an old brown roof
-  const TEAL: [number, number, number] = [PAL.jade2, PAL.jade1, PAL.deep2];
-  const DEEP: [number, number, number] = [PAL.jade1, PAL.deep2, PAL.deep1];
-  const BROWN: [number, number, number] = [PAL.wood, PAL.bark2, PAL.bark1];
-  const onWater = (x: number, y: number) => {
-    if (x < 0 || y < 0 || x >= b.W || y >= b.H) return -1;
-    const i = y * b.W + x;
-    if (b.landD[i]! < LANDL.shallow) return -1;
-    const ti = Math.floor(y / TL) * MW + Math.floor(x / TL);
-    return g.flags[ti]! & F_RUINS && g.kind[ti] === K_WATER ? i : -1;
-  };
-  const put = (x: number, y: number, c: number) => {
-    const i = onWater(x, y);
-    if (i >= 0) b.out[i] = c;
-  };
-  for (let by = 0; by * BY < b.H; by++)
-    for (let bx = 0; bx * BX < b.W; bx++) {
-      const x0 = bx * BX, y0 = by * BY;
-      const ti = Math.floor((y0 + BY / 2) / TL) * MW + Math.floor((x0 + BX / 2) / TL);
-      if (!(g.flags[ti]! & F_RUINS)) continue;
-      // toward the edge of the town the houses thin out
-      const strength = Math.max(0, Math.min(1, (ruinsF((x0 + BX / 2) / TL, (y0 + BY / 2) / TL) - R_CUT) / 0.08 + 0.3));
-      // streets: a faint dashed line along the block's north and west edges
-      for (let x = 0; x < BX; x++) if ((x >> 1) % 2 === 0 && strength > 0.45) put(x0 + x, y0 + 1, PAL.jade1);
-      for (let y = 0; y < BY; y++) if ((y >> 1) % 2 === 0 && strength > 0.45) put(x0 + 1, y0 + y, PAL.jade1);
-      const n = hash(bx, by, 9) > strength ? 0 : hash(bx, by, 10) < 0.55 ? 1 : 2;
-      for (let k = 0; k < n; k++) {
-        const w = 12 + Math.floor(hash(bx, by, 20 + k) * 8), h = 8 + Math.floor(hash(bx, by, 30 + k) * 4) * 2;
-        const half = n === 2 ? BX / 2 : BX;
-        const hx = x0 + (n === 2 && k === 1 ? BX / 2 : 0) + 5 + Math.floor(hash(bx, by, 40 + k) * Math.max(0, half - 8 - w));
-        const hy = y0 + 5 + Math.floor(hash(bx, by, 50 + k) * Math.max(0, BY - 9 - h));
-        // only whole houses: a roof cut by the shore or the town's edge would read as a stray sliver
-        const fits = [[0, 0], [w, 0], [0, h], [w, h], [w >> 1, h >> 1]].every(([dx, dy]) => onWater(hx + dx!, hy + dy!) >= 0);
-        if (!fits) continue;
-        const r = hash(bx, by, 60 + k);
-        const [north, south, ridgeC] = r < 0.2 ? BROWN : r < 0.6 ? TEAL : DEEP;
-        const ridge = h / 2;
-        for (let y = 0; y < h; y++)
-          for (let x = 0; x < w; x++) put(hx + x, hy + y, y === ridge || y === ridge - 1 ? ridgeC : y < ridge ? north : south);
-        // the house's shadow on the sea floor (south and east)
-        for (let x = 2; x <= w; x++) put(hx + x, hy + h, PAL.deep1);
-        for (let y = 2; y < h; y++) put(hx + w, hy + y, PAL.deep1);
-      }
-    }
+/** The water pixel `steps` shades deeper along the sea ramp (negative = lighter). Anything that
+ *  isn't plain water (surf, piers) is left alone. Sunken things are drawn this way: the water's
+ *  own dither and wave streaks run straight across them, so they sit *under* the surface instead
+ *  of reading as crates floating on it. */
+function sink(c: number, steps: number): number {
+  for (let s = 0; s < Math.abs(steps); s++) c = (steps > 0 ? DEEPER : SHALLOWER).get(c) ?? c;
+  return c;
 }
+/** One shade deeper within the same hue (jade stays jade, blue stays blue — a hue jump reads as
+ *  a painted box, not as something under the water). */
+const DEEPER = new Map<number, number>([
+  [PAL.foam2, PAL.foam1], [PAL.foam1, PAL.jade3], [PAL.jade3, PAL.jade2], [PAL.jade2, PAL.jade1], [PAL.jade1, PAL.deep1],
+  [PAL.sea3, PAL.sea2], [PAL.sea2, PAL.sea1], [PAL.sea1, PAL.deep2], [PAL.deep2, PAL.deep1], [PAL.deep1, PAL.navy], [PAL.navy, PAL.ink],
+]);
+const SHALLOWER = new Map<number, number>([
+  [PAL.foam1, PAL.foam2], [PAL.jade3, PAL.foam1], [PAL.jade2, PAL.jade3], [PAL.jade1, PAL.jade2],
+  [PAL.sea2, PAL.sea3], [PAL.sea1, PAL.sea2], [PAL.deep2, PAL.sea1], [PAL.deep1, PAL.deep2], [PAL.navy, PAL.deep1],
+]);
 
 // ── ground styles ───────────────────────────────────────────────────────────
 
@@ -276,16 +242,39 @@ const isWater = (b: Bake, x: number, y: number) => {
 // ── underwater landmarks ────────────────────────────────────────────────────
 
 function drawUnderwater(b: Bake): void {
+  // only open water (the tower itself is drawn on top later by drawPart)
+  /** Deepen (or, negative, lighten) the water at (x, y), like the drowned town (sink). */
+  const deepen = (x: number, y: number, steps: number) => {
+    x = Math.round(x);
+    y = Math.round(y);
+    if (x < 0 || y < 0 || x >= b.W || y >= b.H) return;
+    const i = y * b.W + x;
+    if (b.landD[i]! >= LANDL.shallow) b.out[i] = sink(b.out[i]!, steps);
+  };
   for (const isl of ISL) {
     if (!isl.deco.includes("school_under")) continue;
-    // the drowned school around 종탑섬: a long roof with a courtyard, faint under the water
-    const x0 = (isl.cx - 5.5) * TL, y0 = (isl.cy - 3.5) * TL, w = 11 * TL, h = 7 * TL;
-    box(b, x0, y0, w, h, (lx, ly, x, y) => {
-      const edge = lx < 3 || ly < 3 || lx >= w - 3 || ly >= h - 3;
-      const court = lx > 30 && lx < w - 30 && ly > 24 && ly < h - 24;
-      if (court) return bayer(x, y) < 0.3 ? PAL.jade1 : 0;
-      return bayer(x, y) < (edge ? 0.55 : 0.4) ? (edge ? PAL.red1 : PAL.red2) : 0;
-    });
+    // the drowned school around 종탑섬 (design §3-1): a long two-storey block with the bell tower
+    // rising from its middle, and the schoolyard with its running track to the south — the water
+    // over them a shade deeper, like the drowned town's houses
+    const cx = isl.cx * TL, cy = isl.cy * TL;
+    const bw = 11 * TL, bh = 2.4 * TL, bx = cx - bw / 2, by = cy - bh / 2 - TL * 0.4;
+    for (let y = 0; y < bh; y++)
+      for (let x = 0; x < bw; x++) {
+        const ridge = Math.abs(y - bh / 2) < 1;
+        // window rows on the long faces
+        const win = (y === 3 || y === bh - 4) && x % 6 === 3 && x > 4 && x < bw - 4;
+        deepen(bx + x, by + y, ridge || win ? 2 : y < bh / 2 ? 1 : bayer(bx + x, by + y) < 0.5 ? 2 : 1);
+      }
+    // schoolyard + track
+    const yw = 9 * TL, yh = 2.6 * TL, yx = cx - yw / 2, yy = by + bh + TL * 0.6;
+    for (let y = 0; y < yh; y++)
+      for (let x = 0; x < yw; x++) if ((x + y) % 2 === 0) deepen(yx + x, yy + y, 1);
+    const rx = yw / 2 - 6, ry = yh / 2 - 5;
+    for (let k = 0; k < 160; k++) {
+      if (k % 3 === 2) continue;
+      const a = (k / 160) * Math.PI * 2;
+      deepen(yx + yw / 2 + Math.cos(a) * rx, yy + yh / 2 + Math.sin(a) * ry, -1); // the track's pale lines
+    }
   }
 }
 

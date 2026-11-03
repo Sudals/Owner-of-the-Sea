@@ -1,6 +1,7 @@
-// The boat and the sea's rules (design §3-2, §3-3 자원, §3-4). Shared so the server can
-// check a voyage log against the same numbers later (§11-6).
+// The boat and the sea's rules (design §3-2, §3-3 자원, §3-4; Economy.md §4-3). Shared so the
+// server can check a voyage log against the same numbers (§11-6).
 
+import { balance, derived, live } from "../balance";
 import type { SeaColor } from "./points";
 import { MAP_H, MAP_W, SEA_ORDER } from "./seaMap";
 
@@ -16,30 +17,42 @@ export type HullSpec = {
   radius: number;
 };
 
-export const HULLS: Readonly<Record<HullLv, HullSpec>> = {
-  1: { name: "통통배", hp: 100, speed: 66, radius: 5 },
-  2: { name: "흰 통통배", hp: 140, speed: 78, radius: 5 },
-  3: { name: "철선", hp: 190, speed: 90, radius: 6 },
-  4: { name: "큰 철선", hp: 250, speed: 104, radius: 7 },
-};
+export const HULLS: Readonly<Record<HullLv, HullSpec>> = live(() => balance().boat.hulls) as Readonly<Record<HullLv, HullSpec>>;
 
-export const FUEL = {
-  /** Tank without / with the 연료통 (녹슨항). */
-  base: 100,
-  withTank: 180,
-  /** Fuel per tile travelled on engine. 100 fuel ≈ 220 tiles. */
-  perTile: 0.45,
-  /** Out of fuel you row: this fraction of the hull's top speed (design: 30%). */
-  rowFactor: 0.3,
-} as const;
+/** Fuel tank capacity by 연료통 level (Economy.md §4-3: Lv2 녹슨항, Lv3 녹슨항·유리탑섬). */
+export const TANK_CAP: Readonly<Record<number, number>> = live(() => balance().boat.tankCap);
+
+export const FUEL: Readonly<{ base: number; perTile: number; rowFactor: number }> = live(
+  derived((b) => ({
+    base: b.boat.tankCap["1"] ?? 100,
+    /** Fuel per tile travelled on engine. */
+    perTile: b.boat.fuelPerTile,
+    /** Out of fuel you row: this fraction of the hull's top speed (design: 30%). */
+    rowFactor: b.boat.rowFactor,
+  })),
+);
 
 /** Collision damage: HP lost per px/s of impact speed above `minSpeed`. Reefs bite harder. */
-export const IMPACT = { minSpeed: 18, perSpeed: 0.28, reefMult: 1.6 } as const;
+export const IMPACT: Readonly<{ minSpeed: number; reefPctAtTop: number; shorePctAtTop: number }> = live(() => balance().boat.impact);
 
-/** Hold freshness (design §3-3): seconds at sea until a fish is fully spoiled, per 얼음 창고 level. */
-export const FRESH_SECONDS = [600, 960, 1440] as const;
+/** Hull lost hitting something at `speed` (Economy.md §4-6): a share of max HP, full share at the
+ *  hull's top speed, scaled down for slower bumps, nothing at or below minSpeed. */
+export function impactDamage(hullLv: HullLv, speed: number, reef: boolean): number {
+  const h = HULLS[hullLv], i = IMPACT;
+  const k = Math.max(0, Math.min(1.2, (speed - i.minSpeed) / Math.max(1, h.speed - i.minSpeed)));
+  return Math.round(h.hp * (reef ? i.reefPctAtTop : i.shorePctAtTop) * k);
+}
 
-export type Gear = { hullLv: HullLv; lantern: boolean; fuelTank: boolean };
+/** Share of the hold lost when the boat is towed in (Economy.md §4-6: 30%). */
+export const towLossRate = (): number => balance().boat.towLossRate;
+
+/** Hull lost per second inside a storm of `intensity` 0..1 (Economy.md §4-6: ~3% of max HP a minute). */
+export const stormDamagePerSec = (hullLv: HullLv, intensity: number): number => (HULLS[hullLv].hp * balance().boat.stormDamagePctPerMin * intensity) / 60;
+
+/** Freshness lost per real minute, by 얼음 창고 level 0–3 (Economy.md §2-5: 1.0 / 0.7 / 0.5 / 0.35 %). */
+export const FRESH_DECAY_PER_MIN: readonly number[] = live(() => balance().boat.freshDecayPerMin, []);
+
+export type Gear = { hullLv: HullLv; lantern: boolean; tankLv: number };
 
 /** Who may sail into which sea (design §3-2). null = allowed, otherwise the reason to show. */
 export function seaBlock(sea: SeaColor, g: Gear): string | null {
@@ -50,14 +63,14 @@ export function seaBlock(sea: SeaColor, g: Gear): string | null {
       return g.hullLv >= 2 ? null : "선체 Lv2가 필요해요 (종탑섬)";
     case "indigo":
       if (g.hullLv < 3) return "선체 Lv3이 필요해요 (녹슨항)";
-      return g.fuelTank ? null : "연료통이 필요해요 (녹슨항)";
+      return g.tankLv >= 2 ? null : "연료통 Lv2가 필요해요 (녹슨항)";
     case "ink":
       if (!g.lantern) return "등불이 필요해요 (물소리섬)";
       return g.hullLv >= 4 ? null : "선체 Lv4가 필요해요 (유리탑섬)";
   }
 }
 
-export const fuelMax = (g: Pick<Gear, "fuelTank">) => (g.fuelTank ? FUEL.withTank : FUEL.base);
+export const fuelMax = (g: Pick<Gear, "tankLv">) => TANK_CAP[g.tankLv] ?? TANK_CAP[1]!;
 
 // ── 폭풍 ──────────────────────────────────────────────────────────────────────
 // Cloud fields drifting on fixed loops, driven by the game clock (hours since day 1, 00:00),

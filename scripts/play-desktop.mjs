@@ -104,6 +104,7 @@ const token = await page.evaluate(() => window.desktop.getToken());
 const tokenFile = join(userData, "token.bin");
 const raw = existsSync(tokenFile) ? readFileSync(tokenFile) : Buffer.alloc(0);
 check("device token kept in userData, encrypted (safeStorage)", !!token && raw.length > 0 && !raw.includes(Buffer.from(token)), `${raw.length} bytes`);
+await page.evaluate(() => window.__sea.engine.currentScene.focus("fish"));
 await key(page, "Enter"); // 선착장에서 낚시
 let caught = 0;
 for (let i = 0; i < 2; i++) caught += (await fishOnce(page)) ? 1 : 0;
@@ -133,6 +134,7 @@ check("…and saved to the server", me.hold?.length === caught, `server hold ${m
 // ── 4. closing with unsaved progress asks first; then the window really closes ──
 await key(page, "Enter"); // 이어하기
 await waitFor(page, (s) => s.k === "island", 20_000, "island 2");
+await page.evaluate(() => window.__sea.engine.currentScene.focus("fish"));
 await key(page, "Enter");
 await fishOnce(page);
 await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].close());

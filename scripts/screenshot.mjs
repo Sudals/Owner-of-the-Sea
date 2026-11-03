@@ -30,6 +30,7 @@ await page.waitForFunction(() => window.__sea.engine.currentScene.state.k === "n
 await page.keyboard.insertText("화면확인");
 await page.keyboard.press("Enter");
 await page.waitForFunction(() => window.__sea.engine.currentScene.state.k === "island", null, { timeout: 15_000 });
+await page.evaluate(() => window.__sea.engine.currentScene.focus("fish"));
 await page.keyboard.press("Enter"); // 선착장에서 낚시
 await page.waitForFunction(() => window.__sea.engine.currentScene.state.k === "idle", null, { timeout: 15_000 });
 await page.waitForTimeout(300);

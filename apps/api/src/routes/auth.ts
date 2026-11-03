@@ -1,11 +1,11 @@
-import { OMEN, recoverRequest, START_ISLAND_ID, startRequest, STARTING_PLAYER, type AccountDto } from "@sea/shared";
+import { OMEN, recoverRequest, START, START_ISLAND_ID, startRequest, STARTING_PLAYER, type AccountDto } from "@sea/shared";
 import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { requireAuth, type AuthedEnv } from "../auth/requireAccount";
 import { createSession, hashRecoveryCode, newRecoveryCode } from "../auth/session";
 import { LIMITS, lockedUntil, recordHit, retryAfterSec, throttleKey } from "../auth/throttle";
 import { db, pgErrorOf } from "../db/pool";
-import { accounts, endless, players, sessions, unlocks, type Account } from "../db/schema";
+import { accounts, endless, inventory, players, sessions, unlocks, type Account } from "../db/schema";
 import { apiError, clientIp, internalError, readJson } from "../http";
 
 // Design §5-2 — name only, until Steam:
@@ -46,6 +46,8 @@ authRoutes.post("/start", async (c) => {
       await tx.insert(players).values({ accountId: account!.id, locationId: START_ISLAND_ID, ...STARTING_PLAYER });
       await tx.insert(endless).values({ accountId: account!.id, nextThreshold: OMEN.firstThreshold, thresholdStep: OMEN.firstThreshold });
       await tx.insert(unlocks).values({ accountId: account!.id, islandId: START_ISLAND_ID });
+      // Economy.md §6-2: 50G and 20 worms to start
+      if (START.worms > 0) await tx.insert(inventory).values({ accountId: account!.id, itemId: "bait_worm", qty: START.worms });
       const session = await createSession(tx, account!.id, c.req.header("user-agent") ?? null);
       return { account: account!, session };
     });

@@ -6,6 +6,7 @@ import { requireAuth, type AuthedEnv } from "../auth/requireAccount";
 import { db } from "../db/pool";
 import { fishSessions } from "../db/schema";
 import { apiError, internalError, readJson } from "../http";
+import { latestBalance } from "../logic/config";
 import { POINT_REACH_PX, resolveSpot } from "../logic/world";
 
 // POST /api/session/open (design §11-3): the server picks the seed; the client plays the casts
@@ -65,6 +66,7 @@ sessionRoutes.post("/open", requireAuth, async (c) => {
             spotId: spot.spotId,
             pointId: spot.pointId,
             conds,
+            configVersion: (await latestBalance()).version,
             seed: randomBytes(16),
             expiresAt: sql`now() + make_interval(hours => ${SESSION_HOURS})`,
           })
@@ -81,6 +83,7 @@ sessionRoutes.post("/open", requireAuth, async (c) => {
       conds: row.conds,
       sig: sessionSig(row.id, seed, accountId),
       resumed: !!open,
+      configVersion: row.configVersion,
     };
     return c.json(res);
   } catch (e) {

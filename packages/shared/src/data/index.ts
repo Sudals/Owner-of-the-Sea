@@ -5,3 +5,4 @@ export * from "./points";
 export * from "./odds";
 export * from "./seaMap";
 export * from "./boat";
+export * from "./economy";

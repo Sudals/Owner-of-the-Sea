@@ -3,8 +3,9 @@
 //   1. fish grade (희귀도)  : 일반 → 고급 → 희귀 → 전설      — which tier of species bites
 //   2. size grade (크기 등급): D → C → B → A → S            — how big it is for its species
 // Base tables come from the sea zone (옥빛 → 먹빛 get better), a point may scale them, and
-// dark deep-sea tiles on the top-down map multiply the high end. Tune the numbers here.
+// dark deep-sea tiles on the top-down map multiply the high end. The numbers live in balance.jsonc.
 
+import { balance, live } from "../balance";
 import type { SeaColor } from "./points";
 
 export const FISH_GRADES = ["common", "uncommon", "rare", "legendary"] as const;
@@ -22,13 +23,7 @@ export const GRADE_LABEL: Readonly<Record<FishGrade | "boss", string>> = {
 };
 
 /** Where in its species' size range each size grade falls (fraction of [min, max]). */
-export const SIZE_BANDS: Readonly<Record<SizeGrade, readonly [number, number]>> = {
-  D: [0, 0.35],
-  C: [0.35, 0.6],
-  B: [0.6, 0.8],
-  A: [0.8, 0.93],
-  S: [0.93, 1],
-};
+export const SIZE_BANDS: Readonly<Record<SizeGrade, readonly [number, number]>> = live(() => balance().fishing.sizeBands);
 
 export type Odds = {
   /** Relative weights (they don't need to sum to 100). */
@@ -37,18 +32,13 @@ export type Odds = {
 };
 
 /** Base odds per sea zone (design §3-2): deeper water, rarer and bigger fish. */
-export const ZONE_ODDS: Readonly<Record<SeaColor, Odds>> = {
-  jade: { grade: { common: 78, uncommon: 17, rare: 4.6, legendary: 0.4 }, size: { D: 40, C: 30, B: 18, A: 9, S: 3 } },
-  azure: { grade: { common: 62, uncommon: 27, rare: 10, legendary: 1 }, size: { D: 34, C: 30, B: 20, A: 12, S: 4 } },
-  indigo: { grade: { common: 48, uncommon: 33, rare: 16, legendary: 3 }, size: { D: 28, C: 28, B: 22, A: 16, S: 6 } },
-  ink: { grade: { common: 38, uncommon: 36, rare: 21, legendary: 5 }, size: { D: 22, C: 26, B: 24, A: 20, S: 8 } },
-};
+export const ZONE_ODDS: Readonly<Record<SeaColor, Odds>> = live(() => balance().fishing.zoneOdds);
 
 /** Multipliers for a cast made on a dark deep-sea tile of the top-down map. */
-export const DEEP_TILE_BONUS: OddsMod = { grade: { rare: 1.5, legendary: 2 }, size: { A: 1.5, S: 2 } };
+export const DEEP_TILE_BONUS: OddsMod = live(() => balance().fishing.deepTileBonus);
 
 /** Fishing inside a storm (design §3-3 폭풍): rarer fish come up. */
-export const STORM_BONUS: OddsMod = { grade: { rare: 1.4, legendary: 1.6 } };
+export const STORM_BONUS: OddsMod = live(() => balance().fishing.stormBonus);
 
 /** Per-point (or per-tile) multipliers on top of the zone table. */
 export type OddsMod = { grade?: Partial<Record<FishGrade, number>>; size?: Partial<Record<SizeGrade, number>> };

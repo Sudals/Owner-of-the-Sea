@@ -29,6 +29,8 @@ export const openSessionResponse = z.object({
   /** HMAC(sessionId|seed|accountId) — sent back with the save. */
   sig: z.string(),
   resumed: z.boolean(),
+  /** Balance version this session rolls with (balance.jsonc applied to the DB). */
+  configVersion: z.number().int(),
 });
 
 export type OpenSessionRequest = z.infer<typeof openSessionRequest>;
@@ -41,12 +43,17 @@ export const castRecordSchema = z.object({
   i: z.number().int().min(0).max(1_000_000),
   fishId: id,
   sizeCm: z.number().finite().min(0).max(10_000),
-  result: z.enum(["caught", "escaped"]),
+  /** released = caught but let go because the hold was full (nothing is kept). */
+  result: z.enum(["caught", "escaped", "released"]),
   reelMs: z.number().int().min(0).max(3_600_000),
   /** Client clock when the cast finished (ms). */
   t: z.number().int(),
   /** WorldState.seaTime at the catch (freshness clock). */
   seaT: z.number().finite().min(0).optional(),
+  /** Bait on the hook: an item id or "none" (bare hook). Default 지렁이. Part of the roll. */
+  bait: z.string().max(40).optional(),
+  /** Did a fish bite? Bait is used up on a bite (Economy.md §4-1), not when reeled in before one. Default true. */
+  bit: z.boolean().optional(),
 });
 
 export const worldAt = z.discriminatedUnion("kind", [
@@ -68,7 +75,7 @@ export const reportedWorld = z.object({
 
 export const saveRequest = z.object({
   batchId: z.string().uuid(),
-  reason: z.enum(["manual", "dock", "exit", "recover", "lobby"]),
+  reason: z.enum(["manual", "dock", "exit", "recover", "lobby", "shop"]),
   sessions: z
     .array(
       z.object({
@@ -84,6 +91,21 @@ export const saveRequest = z.object({
   /** Ids of the hold items the client still has. The server keeps only these (fish lost when
    *  towed drop out) and then adds this batch's verified catches. Never adds anything itself. */
   holdIds: z.array(z.string().max(80)).max(2000),
+  /** Trades (design §11-2: closing a shop saves), each stamped with the client clock so the server
+   *  can replay casts and trades in the order they happened. Same rules as shared applyOp. */
+  ops: z
+    .array(
+      z.discriminatedUnion("kind", [
+        z.object({ kind: z.literal("sell"), island: id, ids: z.array(z.string().max(80)).max(200), t: z.number().int() }),
+        z.object({ kind: z.literal("buy"), island: id, item: z.string().max(40), t: z.number().int() }),
+        z.object({ kind: z.literal("fuel"), island: id, t: z.number().int() }),
+        z.object({ kind: z.literal("repair"), island: id, t: z.number().int() }),
+        z.object({ kind: z.literal("gift"), island: id, t: z.number().int() }),
+        z.object({ kind: z.literal("tow"), island: id, t: z.number().int() }),
+      ]),
+    )
+    .max(200)
+    .default([]),
 });
 
 export type SaveRequest = z.infer<typeof saveRequest>;
@@ -97,14 +119,20 @@ export const holdItemDto = z.object({
   spotId: z.string(),
   caughtAt: z.string(),
   freshAt: z.number().optional(),
+  rot: z.number().optional(),
+  salted: z.number().optional(),
 });
 
 export const worldDto = reportedWorld.extend({
   hullLv: z.number().int().min(1).max(4),
-  fuelTank: z.boolean(),
+  tankLv: z.number().int(),
+  holdLv: z.number().int(),
   lantern: z.boolean(),
   iceLv: z.number().int(),
 });
+
+export const dexEntryDto = z.object({ fishId: z.string(), count: z.number().int(), maxSizeCm: z.number() });
+export type DexEntryDto = z.infer<typeof dexEntryDto>;
 
 export const saveResponse = z.object({
   batchId: z.string(),
@@ -116,6 +144,13 @@ export const saveResponse = z.object({
   world: worldDto,
   hold: z.array(holdItemDto),
   gear: z.object({ rodLv: z.number().int(), lineLv: z.number().int() }),
+  gold: z.number().int(),
+  dex: z.array(dexEntryDto),
+  inventory: z.record(z.string(), z.number().int()),
+  marketLog: z.object({ demand: z.record(z.string(), z.tuple([z.number(), z.number()])), gift: z.string().optional() }),
+  /** Balance version the reply was computed with (shop prices). */
+  configVersion: z.number().int(),
+  rejectedOps: z.array(z.object({ index: z.number().int(), why: z.string() })),
   sessions: z.array(z.object({ sessionId: z.string(), nextIndex: z.number().int(), closed: z.boolean() })),
 });
 

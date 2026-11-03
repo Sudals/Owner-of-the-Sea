@@ -1,5 +1,6 @@
-import type { CastRecord, FishingSession, GameBackend, Gear, HoldItem, Profile, SessionSpot, WorldState } from "@sea/game";
-import { FUEL, HULLS, newSeedHex, START_ISLAND } from "@sea/shared";
+import type { CastRecord, DexEntry, FishingSession, GameBackend, Gear, HoldItem, Inventory, Profile, SessionSpot, WorldState } from "@sea/game";
+import { emptyLog, FUEL, HULLS, newSeedHex, normalizeLog, START, START_ISLAND, type MarketLog, type OpResult, type ShopOp } from "@sea/shared";
+import { castOn, tradeOn } from "./ledger";
 
 // Demo-build backend (design §2, §7, §11-5): everything in localStorage, seeds made locally.
 // The player is just a name kept in this browser (design §5) — no server, no 이어하기 코드.
@@ -20,6 +21,10 @@ type Store = {
   hold: HoldItem[];
   gear: Gear;
   world: WorldState;
+  gold: number;
+  dex: DexEntry[];
+  inventory: Inventory;
+  marketLog: MarketLog;
 };
 
 /** A new player: tied up at 빨간등대 with grandfather's 통통배 (design §3-1, §3-4). */
@@ -28,7 +33,8 @@ const freshWorld = (): WorldState => ({
   hullLv: 1,
   hullHp: HULLS[1].hp,
   fuel: FUEL.base,
-  fuelTank: false,
+  tankLv: 1,
+  holdLv: 1,
   lantern: false,
   iceLv: 0,
   day: 1,
@@ -37,7 +43,19 @@ const freshWorld = (): WorldState => ({
   chart: "",
 });
 
-const fresh = (): Store => ({ profile: null, sessions: {}, journal: [], hold: [], gear: { rodLv: 1, lineLv: 1 }, world: freshWorld() });
+/** Economy.md §6-2: 50G and 20 worms to start. */
+const fresh = (): Store => ({
+  profile: null,
+  sessions: {},
+  journal: [],
+  hold: [],
+  gear: { rodLv: 1, lineLv: 1 },
+  world: freshWorld(),
+  gold: START.gold,
+  dex: [],
+  inventory: START.worms > 0 ? { bait_worm: START.worms } : {},
+  marketLog: emptyLog(),
+});
 
 export class LocalBackend implements GameBackend {
   private store: Store;
@@ -63,8 +81,7 @@ export class LocalBackend implements GameBackend {
     if (!s) return;
     s.nextIndex = Math.max(s.nextIndex, cast.i + 1);
     this.store.journal.push({ sessionId, cast });
-    if (cast.result === "caught")
-      this.store.hold.push({ id: `${sessionId}:${cast.i}`, fishId: cast.fishId, sizeCm: cast.sizeCm, spotId: s.spotId, caughtAt: new Date(cast.t).toISOString(), freshAt: cast.seaT ?? this.store.world.seaTime });
+    castOn(this.store, sessionId, s.spotId, cast, this.store.world.seaTime);
     this.save();
   }
 
@@ -86,6 +103,38 @@ export class LocalBackend implements GameBackend {
   dropHold(indices: number[]): void {
     const drop = new Set(indices);
     this.store.hold = this.store.hold.filter((_, i) => !drop.has(i));
+    this.save();
+  }
+
+  gold(): number {
+    return this.store.gold;
+  }
+
+  dex(): DexEntry[] {
+    return this.store.dex;
+  }
+
+  inventory(): Inventory {
+    return this.store.inventory;
+  }
+
+  marketLog(): MarketLog {
+    return this.store.marketLog;
+  }
+
+  trade(op: ShopOp): OpResult {
+    const s = this.store;
+    const st = { gold: s.gold, hold: s.hold, inventory: s.inventory, gear: s.gear, world: s.world, log: s.marketLog };
+    const r = tradeOn(st, op);
+    if (r.ok) {
+      Object.assign(s, { gold: st.gold, hold: st.hold, inventory: st.inventory, marketLog: st.log });
+      this.save();
+    }
+    return r;
+  }
+
+  devGrant(gold: number): void {
+    this.store.gold += gold;
     this.save();
   }
 
@@ -135,7 +184,12 @@ export class LocalBackend implements GameBackend {
       if (!raw) return fresh();
       const saved = JSON.parse(raw) as Partial<Store>;
       // saves from before the sea map (M6) have no world: start them tied up at 빨간등대
-      return { ...fresh(), ...saved, world: { ...freshWorld(), ...saved.world } };
+      const store: Store = { ...fresh(), ...saved, world: { ...freshWorld(), ...saved.world }, marketLog: normalizeLog(saved.marketLog) };
+      // saves from before M5 had no bait: hand over the starting worms once
+      if (!saved.inventory) store.inventory = { bait_worm: START.worms };
+      // hold items from before M4 had no id (and so couldn't be sold): give them one
+      store.hold.forEach((h, i) => (h.id ??= `legacy:${i}:${h.caughtAt}`));
+      return store;
     } catch {
       return fresh();
     }

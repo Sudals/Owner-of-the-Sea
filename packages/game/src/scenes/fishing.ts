@@ -1,6 +1,6 @@
-import { FISH_BY_ID, GRADE_LABEL, omenCastIndex, POINT_BY_ID, rollCast, START_ISLAND, type CastRoll, type FishData, type FishingPoint } from "@sea/shared";
+import { balance, BARE_HOOK, FISH_BY_ID, GRADE_LABEL, holdCap, ITEMS, omenCastIndex, POINT_BY_ID, rollCast, START_ISLAND, withBalance, type CastRoll, type FishData, type FishingPoint, type ItemId } from "@sea/shared";
 import type { LutName } from "@sea/sprites/palette";
-import { lutHex, type BgName } from "../assets";
+import { islandBg, lutHex, type BgName } from "../assets";
 import type { CastResult, FishingSession, GameBackend, SessionSpot } from "../backend";
 import type { Engine, Scene } from "../engine";
 import type { Game } from "../game";
@@ -47,7 +47,8 @@ const BOAT_X = 236;
 const BOAT_DRAFT = 24; // boat sprite row sitting on the waterline
 const CAST_TIME = 0.6;
 const CHARGE_PERIOD = 1.1;
-const BITE_WINDOW = 0.6; // design §4-1
+const BITE_WINDOW = () => balance().fishing.biteWindowSec; // design §4-1
+const BAIT_BTN = { x: 470, y: 316, w: 162, h: 20 };
 const LEAVE_BTN = { x: 508, y: 8, w: 124, h: 18 };
 
 const AMBIENT: Record<"dock" | SeaId, string[]> = {
@@ -59,7 +60,7 @@ const AMBIENT: Record<"dock" | SeaId, string[]> = {
 };
 
 type Ambient = { id: string; x: number; y: number; vx: number; phase: number; w: number };
-type Hooked = { roll: CastRoll; i: number; fish: FishData; castPower: number };
+type Hooked = { roll: CastRoll; i: number; fish: FishData; castPower: number; bait: string };
 type LostReason = "missed" | "snapped" | "escaped" | "reeled_in";
 
 type State =
@@ -70,7 +71,7 @@ type State =
   | { k: "waiting"; t: number; hooked: Hooked; floatX: number; nibbles: number[] }
   | { k: "bite"; t: number; hooked: Hooked; floatX: number }
   | { k: "reeling"; t: number; hooked: Hooked; floatX: number; reel: Reel; fishPos: [number, number] }
-  | { k: "caught"; t: number; hooked: Hooked }
+  | { k: "caught"; t: number; hooked: Hooked; released?: boolean }
   | { k: "lost"; t: number; reason: LostReason; hooked: Hooked | null; from: [number, number] | null };
 
 const LOST_TEXT: Record<LostReason, string> = {
@@ -169,7 +170,7 @@ export class FishingScene implements Scene {
   }
 
   private get bgName(): BgName {
-    return this.spot.kind === "dock" ? "bg_dock" : (`bg_sea_${this.spot.sea}` as BgName);
+    return this.spot.kind === "dock" ? islandBg(this.spot.islandId ?? START_ISLAND.id) : (`bg_sea_${this.spot.sea}` as BgName);
   }
 
   /** Lowest y a fish may swim at, at column x. */
@@ -216,6 +217,10 @@ export class FishingScene implements Scene {
         return;
       case "idle":
         s.t += dt;
+        if (this.game && (input.hit("KeyE") || input.hit("KeyQ") || (input.clicked && inRect(input.clicked, BAIT_BTN)))) {
+          this.game.cycleBait(input.hit("KeyQ") ? -1 : 1);
+          return;
+        }
         if (input.pressed) this.state = { k: "charging", t: 0 };
         return;
       case "charging":
@@ -235,7 +240,7 @@ export class FishingScene implements Scene {
         s.t += dt;
         if (input.pressed) {
           // pulled the line in before anything bit — the rolled fish never showed itself
-          this.finishCast(s.hooked, "escaped", 0);
+          this.finishCast(s.hooked, "escaped", 0, false);
           this.state = { k: "lost", t: 0, reason: "reeled_in", hooked: null, from: null };
           this.say(LOST_TEXT.reeled_in, 1.2);
         } else if (s.t >= s.hooked.roll.waitSec) this.state = { k: "bite", t: 0, hooked: s.hooked, floatX: s.floatX };
@@ -247,7 +252,7 @@ export class FishingScene implements Scene {
           const gear = this.backend.gear();
           const reel = new Reel({ power: fish.power, erratic: fish.erratic, boss: fish.rarity === "boss", rodLv: gear.rodLv, lineLv: gear.lineLv, castPower });
           this.state = { k: "reeling", t: 0, hooked: s.hooked, floatX: s.floatX, reel, fishPos: [s.floatX, this.waterline + 14] };
-        } else if (s.t >= BITE_WINDOW) {
+        } else if (s.t >= BITE_WINDOW()) {
           this.finishCast(s.hooked, "escaped", 0);
           this.state = { k: "lost", t: 0, reason: "missed", hooked: s.hooked, from: [s.floatX, this.waterline + 16] };
           this.say(LOST_TEXT.missed);
@@ -260,8 +265,9 @@ export class FishingScene implements Scene {
         if (!out) return;
         const ms = Math.round(s.t * 1000);
         if (out === "caught") {
+          const released = this.holdFull;
           this.finishCast(s.hooked, "caught", ms);
-          this.state = { k: "caught", t: 0, hooked: s.hooked };
+          this.state = { k: "caught", t: 0, hooked: s.hooked, released };
         } else {
           this.finishCast(s.hooked, "escaped", ms);
           this.state = { k: "lost", t: 0, reason: out, hooked: s.hooked, from: s.fishPos };
@@ -330,16 +336,26 @@ export class FishingScene implements Scene {
     const spot = this.spot;
     // the session's conditions are the ones that count (the server fixes them in the full build)
     const conds = sess.conds ?? { deep: spot.kind === "boat" && !!spot.deep, storm: spot.kind === "boat" && !!spot.storm };
-    const roll = rollCast(sess.seed, i, this.point, { pollutant, deep: conds.deep, storm: conds.storm });
+    const bait = this.game?.currentBait() ?? "bait_worm";
+    const opts = { pollutant, deep: conds.deep, storm: conds.storm, bait };
+    // a session that opened under another balance version rolls with it (pool and odds included)
+    const roll = sess.balance ? withBalance(sess.balance, () => rollCast(sess.seed, i, POINT_BY_ID[this.point.id] ?? this.point, opts)) : rollCast(sess.seed, i, this.point, opts);
     const fish = FISH_BY_ID[roll.fishId]!;
     // fake nibbles before the real bite: purely visual
     const nibbles = Array.from({ length: Math.floor(Math.random() * 3) }, () => 0.6 + Math.random() * Math.max(0.2, roll.waitSec - 1.4)).sort((a, b) => a - b);
-    this.state = { k: "waiting", t: 0, hooked: { roll, i, fish, castPower: power }, floatX, nibbles };
+    this.state = { k: "waiting", t: 0, hooked: { roll, i, fish, castPower: power, bait }, floatX, nibbles };
   }
 
-  private finishCast(h: Hooked, result: CastResult, reelMs: number): void {
+  /** The hold is full: a catch is let go (design §4-4 — time to head for port). */
+  private get holdFull(): boolean {
+    return !!this.game && this.backend.hold().length >= holdCap(this.game.world.holdLv);
+  }
+
+  /** `bit` false = reeled in before the bite: the bait stays on the hook (Economy.md §4-1). */
+  private finishCast(h: Hooked, result: CastResult, reelMs: number, bit = true): void {
     if (!this.session) return;
-    this.backend.recordCast(this.session.sessionId, { i: h.i, fishId: h.roll.fishId, sizeCm: h.roll.sizeCm, result, reelMs, t: Date.now(), seaT: this.game?.world.seaTime });
+    if (result === "caught" && this.holdFull) result = "released";
+    this.backend.recordCast(this.session.sessionId, { i: h.i, fishId: h.roll.fishId, sizeCm: h.roll.sizeCm, result, reelMs, t: Date.now(), seaT: this.game?.world.seaTime, bait: h.bait, ...(bit ? {} : { bit: false }) });
   }
 
   private moveAmbient(dt: number): void {
@@ -582,7 +598,7 @@ export class FishingScene implements Scene {
     }
 
     // status line
-    const hold = this.backend.hold().length;
+    const hold = this.game ? `${this.backend.hold().length}/${holdCap(this.game.world.holdLv)}` : `${this.backend.hold().length}`;
     const gear = this.backend.gear();
     const sp = this.spot;
     const tags = sp.kind === "boat" ? `${sp.deep ? " (심해)" : ""}${sp.storm ? " (폭풍)" : ""}` : "";
@@ -595,6 +611,12 @@ export class FishingScene implements Scene {
     }
     if (s.k === "loading") text(ctx, "…", 320, 170, { align: "center" });
 
+    if (this.game && !this.pause) {
+      const bait = this.game.currentBait();
+      const n = bait === BARE_HOOK ? 0 : (this.backend.inventory()[bait as ItemId] ?? 0);
+      const label = bait === BARE_HOOK ? "미끼 없음 · 맨 바늘" : `${ITEMS[bait as ItemId]?.name ?? bait} ×${n}`;
+      button(ctx, assets, s.k === "idle" ? "normal" : "disabled", `${label}  Q/E`, BAIT_BTN.x, BAIT_BTN.y, BAIT_BTN.w, BAIT_BTN.h);
+    }
     if (this.game && !this.pause) button(ctx, assets, s.k === "idle" || s.k === "loading" ? "normal" : "disabled", `◀ ${this.leaveLabel}`, LEAVE_BTN.x, LEAVE_BTN.y, LEAVE_BTN.w, LEAVE_BTN.h);
     if (this.pause) {
       dim(ctx, 0.5);
@@ -624,7 +646,9 @@ export class FishingScene implements Scene {
     assets.draw(ctx, h.fish.sheet, h.fish.id, cx - ff.w / 2, y + 26);
     const tier = h.fish.tier ? ` ${h.fish.tier}` : "";
     text(ctx, `${h.fish.name}  ${h.roll.sizeCm.toFixed(1)}cm`, cx, y + 32 + ff.h, { align: "center", color: ink, shadow: null });
-    text(ctx, `${GRADE_LABEL[h.fish.rarity]}${tier} · 크기 ${h.roll.sizeGrade}급 · 창고에 넣었다`, cx, y + 46 + ff.h, { align: "center", color: muted, shadow: null });
+    const s = this.state;
+    const released = s.k === "caught" && s.released;
+    text(ctx, `${GRADE_LABEL[h.fish.rarity]}${tier} · 크기 ${h.roll.sizeGrade}급 · ${released ? "창고가 가득 차 놓아주었다" : "창고에 넣었다"}`, cx, y + 46 + ff.h, { align: "center", color: released ? lutHex("red2") : muted, shadow: null });
     if (t > 0.5 && Math.floor(t * 2) % 2 === 0) text(ctx, "▼", x + w - 16, y + hgt - 16, { color: muted, shadow: null });
   }
 }

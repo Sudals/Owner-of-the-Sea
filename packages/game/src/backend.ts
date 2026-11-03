@@ -1,3 +1,5 @@
+import type { Balance, ItemId, MarketLog, OpResult, ShopOp } from "@sea/shared";
+
 // GameBackend (design §7, §11): the game never knows where data lives.
 //   LocalBackend  — demo build: localStorage, local seeds (apps/client/src/backend)
 //   RemoteBackend — full build: /api/session/open + /api/save (M4)
@@ -13,6 +15,8 @@ export type FishingSession = {
   omenFrom: number | null;
   /** Deep tile / storm as fixed when the session opened (the server decides them in the full build). */
   conds?: { deep: boolean; storm: boolean };
+  /** The balance the session opened under, when it isn't the one loaded now (casts roll with it). */
+  balance?: Balance;
 };
 
 /** What a fishing scene asks to open: the spot, and where/when the boat is (sea points). */
@@ -27,11 +31,15 @@ export type SessionSpot = {
   storm?: boolean;
 };
 
-export type SaveReason = "manual" | "dock" | "exit" | "recover" | "lobby";
+export type SaveReason = "manual" | "dock" | "exit" | "recover" | "lobby" | "shop";
 export type SaveOutcome = { ok: boolean; message: string; caught?: number; rejected?: number };
 export type SaveStatus = { lastSavedAt: number | null; unsavedCaught: number; dirty: boolean };
 
-export type CastResult = "caught" | "escaped";
+/** released = caught, but let go because the hold was full. */
+export type CastResult = "caught" | "escaped" | "released";
+
+/** One 도감 entry (design §4-3). */
+export type DexEntry = { fishId: string; count: number; maxSizeCm: number };
 
 export type CastRecord = {
   i: number;
@@ -44,6 +52,10 @@ export type CastRecord = {
   t: number;
   /** WorldState.seaTime at the cast (freshness clock). */
   seaT?: number;
+  /** Bait on the hook (an item id, or "none"): part of the roll. */
+  bait?: string;
+  /** false = reeled in before anything bit: the bait stays on (Economy.md §4-1). */
+  bit?: boolean;
 };
 
 export type HoldItem = {
@@ -53,9 +65,15 @@ export type HoldItem = {
   sizeCm: number;
   spotId: string;
   caughtAt: string;
-  /** WorldState.seaTime when caught — freshness drops with time at sea after this (design §3-3). */
+  /** WorldState.seaTime when caught — freshness drops from here (Economy.md §2-5). */
   freshAt?: number;
+  /** Rots this much faster (검은 미끼 ×1.5). */
+  rot?: number;
+  /** 소금 절임: freshness frozen at this %. */
+  salted?: number;
 };
+
+export type Inventory = Partial<Record<ItemId, number>>;
 
 /** Where the player is and what the boat has (design §3-3, §3-4, §8 players). */
 export type WorldState = {
@@ -63,13 +81,16 @@ export type WorldState = {
   hullLv: 1 | 2 | 3 | 4;
   hullHp: number;
   fuel: number;
-  fuelTank: boolean;
+  /** 연료통 level 1–3 (max fuel). */
+  tankLv: number;
+  /** 화물칸 level 1–4 (hold slots). */
+  holdLv: number;
   lantern: boolean;
   iceLv: number;
   day: number;
   /** Game clock, 0–24. */
   hour: number;
-  /** Seconds spent at sea, all-time (the freshness clock). */
+  /** Seconds of play, all-time — the freshness clock (it runs at sea, docked and fishing alike). */
   seaTime: number;
   /** Fog of war on the 해도: one bit per map tile, base64. */
   chart: string;
@@ -98,6 +119,17 @@ export interface GameBackend {
   hold(): HoldItem[];
   /** Drop hold items (e.g. lost when the boat is towed). */
   dropHold(indices: number[]): void;
+  gold(): number;
+  dex(): DexEntry[];
+  /** Bait and consumables on board. */
+  inventory(): Inventory;
+  /** Today's sales per island × species (포화) and the daily-gift stamp. */
+  marketLog(): MarketLog;
+  /** A trade at an island (sell fish / buy fuel, repairs, gear). Applied now with the shared rules;
+   *  in the full build it is journaled and the server confirms it on the next save. */
+  trade(op: ShopOp): OpResult;
+  /** Dev cheat (Economy.md §9 골드 지급) — local saves only; the server owns the gold. */
+  devGrant?(gold: number): void;
 
   // ── world (design §3-3, §11-2): where the boat is, fuel, hull, chart ──
   world(): WorldState;

@@ -10,6 +10,7 @@ import {
   pgTable,
   primaryKey,
   real,
+  serial,
   text,
   timestamp,
   uniqueIndex,
@@ -80,7 +81,12 @@ export const players = pgTable(
     hullHp: integer("hull_hp").notNull(),
     fuel: real("fuel").notNull(),
     hasLantern: boolean("has_lantern").notNull().default(false),
-    fuelTank: boolean("fuel_tank").notNull().default(false),
+    /** 연료통 level 1–3 (Economy.md §4-3). */
+    tankLv: integer("tank_lv").notNull().default(1),
+    /** 화물칸 level 1–4 (hold slots). */
+    holdLv: integer("hold_lv").notNull().default(1),
+    /** Today's sales per island × species (포화) + the daily-gift stamp (Economy.md §2-6, §8-2). */
+    marketLog: jsonb("market_log").$type<{ demand: Record<string, [number, number]>; gift?: string }>().notNull().default({ demand: {} }),
     iceLv: integer("ice_lv").notNull().default(0),
     // Out at sea when saved (design §8): boat position in world px; null while tied up at an island.
     seaX: real("sea_x"),
@@ -158,6 +164,8 @@ export const fishSessions = pgTable(
     pointId: text("point_id").notNull(),
     /** Deep tile / storm, fixed when the session opened (the server read them from the position). */
     conds: jsonb("conds").$type<CastConds>().notNull().default({ deep: false, storm: false }),
+    /** game_config version the casts roll with (0 = the default bundled with the API). */
+    configVersion: integer("config_version").notNull().default(0),
     seed: bytea("seed").notNull(),
     nextIndex: integer("next_index").notNull().default(0),
     createdAt: createdAt(),
@@ -184,6 +192,15 @@ export const commits = pgTable(
   },
   (t) => [index("commits_account_time_idx").on(t.accountId, t.createdAt.desc())],
 );
+
+/** balance.jsonc, applied by `pnpm balance:apply` — one row per version (design: one tunable file). */
+export const gameConfig = pgTable("game_config", {
+  version: serial("version").primaryKey(),
+  data: jsonb("data").notNull(),
+  hash: text("hash").notNull(),
+  note: text("note"),
+  createdAt: createdAt(),
+});
 
 export const notableReason = pgEnum("notable_reason", ["boss", "rare", "record", "trophy"]);
 

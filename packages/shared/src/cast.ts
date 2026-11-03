@@ -1,3 +1,4 @@
+import { balance } from "./balance";
 import { FISH_BY_ID } from "./data/fish";
 import { applyMod, DEEP_TILE_BONUS, FISH_GRADES, STORM_BONUS, SIZE_BANDS, SIZE_GRADES, ZONE_ODDS, type FishGrade, type Odds, type SizeGrade } from "./data/odds";
 import { POLLUTANT_BY_SEA, type FishingPoint } from "./data/points";
@@ -17,7 +18,14 @@ export type CastOptions = {
   deep?: boolean;
   /** Cast made inside a storm (§3-3). */
   storm?: boolean;
+  /** Bait on the hook (Economy.md §4-1): an item id, or "none" for a bare hook. Default: 지렁이. */
+  bait?: string;
 };
+
+export const BARE_HOOK = "none";
+
+/** Is a cast in "deep water" for baits that only work there (발광 미끼: 남빛·먹빛·심해 칸)? */
+const deepWater = (point: FishingPoint, deep: boolean) => deep || point.sea === "indigo" || point.sea === "ink";
 
 /** Effective odds at a point (zone table × point tweak × deep-tile bonus × storm bonus). */
 export function oddsAt(point: FishingPoint, deep = point.deep ?? false, storm = false): Odds {
@@ -26,7 +34,11 @@ export function oddsAt(point: FishingPoint, deep = point.deep ?? false, storm = 
 
 export function rollCast(seedHex: string, castIndex: number, point: FishingPoint, opts: CastOptions = {}): CastRoll {
   const r = seeded(seedHex, "cast", castIndex);
-  const odds = oddsAt(point, opts.deep ?? point.deep ?? false, opts.storm ?? false);
+  const b = balance();
+  const deep = opts.deep ?? point.deep ?? false;
+  const bait = b.fishing.bait[opts.bait ?? "bait_worm"] ?? {};
+  const baitWorks = !bait.onlyDeep || deepWater(point, deep);
+  const odds = applyMod(oddsAt(point, deep, opts.storm ?? false), baitWorks ? { grade: bait.grade, size: bait.size } : undefined);
 
   let fishId: string;
   if (opts.pollutant) fishId = POLLUTANT_BY_SEA[point.sea];
@@ -38,15 +50,26 @@ export function rollCast(seedHex: string, castIndex: number, point: FishingPoint
       grade = FISH_GRADES[--gi]!;
       pool = speciesOf(point, grade);
     }
-    fishId = pool[Math.floor(r() * pool.length)] ?? point.pool[0]!;
+    // 대형 미끼: big species are likelier (same single draw as the uniform pick)
+    const big = baitWorks && bait.largeFish && bait.largeFish !== 1 ? bait.largeFish : 0;
+    fishId = big
+      ? weighted(r, pool.map((id) => [id, isLarge(id) ? big : 1] as const))
+      : (pool[Math.floor(r() * pool.length)] ?? point.pool[0]!);
   }
 
   const sizeGrade = weighted(r, SIZE_GRADES.map((g) => [g, odds.size[g]] as const));
   const [lo, hi] = SIZE_BANDS[sizeGrade];
   const [min, max] = FISH_BY_ID[fishId]!.size;
   const sizeCm = Math.round((min + (max - min) * (lo + r() * (hi - lo))) * 10) / 10;
-  const waitSec = 2 + r() * 6; // design §4-1: 2–8 s
+  const [w0, w1] = b.fishing.waitSec; // design §4-1: 2–8 s
+  const waitSec = (w0 + r() * (w1 - w0)) * (bait.waitMul ?? 1); // a bare hook waits longer
   return { fishId, sizeCm, sizeGrade, waitSec };
+}
+
+/** 대형: the middle of the species' size range is at least economy.largeFromCm. */
+function isLarge(fishId: string): boolean {
+  const f = FISH_BY_ID[fishId];
+  return !!f && (f.size[0] + f.size[1]) / 2 >= balance().economy.largeFromCm;
 }
 
 function speciesOf(point: FishingPoint, grade: FishGrade): string[] {

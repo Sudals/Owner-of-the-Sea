@@ -36,6 +36,20 @@
       "when": 1793682287490,
       "tag": "0004_sea_and_sessions",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793686341733,
+      "tag": "0005_config_and_drop_fuel_tank",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793686713608,
+      "tag": "0006_tank_hold_market_log",
+      "breakpoints": true
     }
   ]
 }

@@ -1,4 +1,4 @@
-import { dockFacing, ISLAND_BY_ID, START_ISLAND, TILE } from "@sea/shared";
+import { BARE_HOOK, dockFacing, ISLAND_BY_ID, ITEMS, START_ISLAND, TILE, type ItemId } from "@sea/shared";
 import type { Assets } from "./assets";
 import { lutHex } from "./assets";
 import type { GameBackend, SaveOutcome, SaveReason, WorldState } from "./backend";
@@ -49,12 +49,35 @@ export class Game {
     return (this.world.day - 1) * 24 + this.clock.hours;
   }
 
-  /** Advance the clock (and the freshness clock while at sea). */
-  tick(dt: number, atSea: boolean): void {
+  /** Advance the clock and the freshness clock (Economy.md §2-5: fish keep spoiling docked and
+   *  while fishing, not only at sea). `_atSea` stays for callers; the clock runs everywhere. */
+  tick(dt: number, _atSea: boolean): void {
     const before = this.clock.hours;
     this.clock.update(dt);
     if (this.clock.hours < before) this.world.day++;
-    if (atSea) this.world.seaTime += dt;
+    this.world.seaTime += dt;
+  }
+
+  // ── bait (Economy.md §4-1) ──
+  private bait = "bait_worm";
+
+  /** Baits on board (count > 0) in catalog order, then a bare hook. */
+  baitChoices(): string[] {
+    const inv = this.backend.inventory();
+    const baits = (Object.keys(ITEMS) as ItemId[]).filter((id) => ITEMS[id].kind === "bait" && (inv[id] ?? 0) > 0);
+    return [...baits, BARE_HOOK];
+  }
+
+  /** The bait the next cast uses: the chosen one while it lasts, else the first on board, else a bare hook. */
+  currentBait(): string {
+    const c = this.baitChoices();
+    return c.includes(this.bait) ? this.bait : c[0]!;
+  }
+
+  cycleBait(d: number): void {
+    const c = this.baitChoices();
+    const i = c.indexOf(this.currentBait());
+    this.bait = c[(i + d + c.length * 4) % c.length]!;
   }
 
   /** Keep the world in the backend (local journal; a server sees it on the next commit). */

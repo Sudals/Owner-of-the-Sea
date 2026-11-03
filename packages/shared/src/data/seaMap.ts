@@ -158,7 +158,7 @@ export type MapPoint = {
 /** Stop within this many tiles of a point to fish there. */
 export const POINT_RADIUS = 3;
 /** Within this many tiles of a dock you can tie up. */
-export const DOCK_RADIUS = 2.5;
+export const DOCK_RADIUS = 3.5;
 
 // ── fields (continuous, in tile units) ───────────────────────────────────────
 
@@ -389,6 +389,9 @@ export function dockNear(px: number, py: number): Island | null {
   return null;
 }
 
-export function nearestIsland(px: number, py: number): Island {
-  return [...ISLANDS].sort((a, b) => Math.hypot(px - a.dock[0] * TILE, py - a.dock[1] * TILE) - Math.hypot(px - b.dock[0] * TILE, py - b.dock[1] * TILE))[0]!;
+/** The closest island dock, optionally among those that pass `ok` (falls back to any island). */
+export function nearestIsland(px: number, py: number, ok: (id: string) => boolean = () => true): Island {
+  const d = (i: Island) => Math.hypot(px - i.dock[0] * TILE, py - i.dock[1] * TILE);
+  const pool = ISLANDS.filter((i) => ok(i.id));
+  return [...(pool.length ? pool : ISLANDS)].sort((a, b) => d(a) - d(b))[0]!;
 }

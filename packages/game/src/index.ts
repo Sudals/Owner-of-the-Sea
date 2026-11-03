@@ -3,8 +3,8 @@ import type { GameBackend } from "./backend";
 import { Engine } from "./engine";
 import { Game, type BuildMode } from "./game";
 
-export { Assets, ATLASES, BACKGROUNDS, lutHex, type AtlasName, type BgName, type Frame } from "./assets";
-export type { CastRecord, CastResult, FishingSession, GameBackend, Gear, HoldItem, Profile, SaveOutcome, SaveReason, SaveStatus, SessionSpot, WorldState } from "./backend";
+export { Assets, ATLASES, BACKGROUNDS, islandBg, lutHex, type AtlasName, type BgName, type Frame } from "./assets";
+export type { CastRecord, CastResult, DexEntry, FishingSession, GameBackend, Gear, HoldItem, Inventory, Profile, SaveOutcome, SaveReason, SaveStatus, SessionSpot, WorldState } from "./backend";
 export { Game, type BuildMode } from "./game";
 export { Settings, type SettingsData } from "./settings";
 export { TitleScene, type TitleState } from "./scenes/title";

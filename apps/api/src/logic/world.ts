@@ -13,7 +13,8 @@ export function worldOf(p: Player): WorldDto {
     hullLv: p.hullLv,
     hullHp: p.hullHp,
     fuel: p.fuel,
-    fuelTank: p.fuelTank,
+    tankLv: p.tankLv,
+    holdLv: p.holdLv,
     lantern: p.hasLantern,
     iceLv: p.iceLv,
     day: p.day,
@@ -32,7 +33,7 @@ const B64 = /^[A-Za-z0-9+/]*={0,2}$/;
 export function applyReported(p: Player, w: ReportedWorld): { patch: Partial<Player>; flags: string[] } {
   const flags: string[] = [];
   const hullMax = HULLS[p.hullLv as HullLv]?.hp ?? 100;
-  const fMax = fuelMax({ fuelTank: p.fuelTank });
+  const fMax = fuelMax({ tankLv: p.tankLv });
   const patch: Partial<Player> = {
     hullHp: Math.round(Math.max(0, Math.min(hullMax, w.hullHp))),
     fuel: Math.max(0, Math.min(fMax, w.fuel)),

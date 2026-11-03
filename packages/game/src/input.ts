@@ -14,6 +14,8 @@ export class Input {
   clicked: { x: number; y: number } | null = null;
   /** Every pointer-down since the previous step, oldest first (fast double clicks on "+"). */
   clicks: { x: number; y: number }[] = [];
+  /** Mouse wheel notches since the previous step (+ = down). */
+  wheel = 0;
 
   private raw = false;
   private presses = 0;
@@ -26,6 +28,7 @@ export class Input {
   private keysDown = new Set<string>();
   private stick = { x: 0, y: 0 };
   private pendingClicks: { x: number; y: number }[] = [];
+  private pendingWheel = 0;
   private readonly off: (() => void)[] = [];
 
   constructor(private readonly target: HTMLElement) {
@@ -44,6 +47,10 @@ export class Input {
     on(target, "pointerup", (e) => this.setSource(`p${e.pointerId}`, false));
     on(target, "pointercancel", (e) => this.setSource(`p${e.pointerId}`, false));
     on(target, "contextmenu", (e) => e.preventDefault());
+    on(target, "wheel", (e) => {
+      e.preventDefault();
+      this.pendingWheel += Math.sign(e.deltaY);
+    }, { passive: false });
     on(window, "keydown", (e) => {
       // Enter that commits a Hangul IME composition is not a button press
       if (e.isComposing || e.keyCode === 229) return;
@@ -78,6 +85,8 @@ export class Input {
     this.clicks = this.pendingClicks;
     this.clicked = this.clicks[0] ?? null;
     this.pendingClicks = [];
+    this.wheel = this.pendingWheel;
+    this.pendingWheel = 0;
   }
 
   /** How many times a key (KeyboardEvent.code) went down since the previous step — menus and dev

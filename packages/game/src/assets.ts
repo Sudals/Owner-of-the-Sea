@@ -16,8 +16,24 @@ export type BgMeta = {
 
 export const ATLASES = ["fish", "angler", "boat", "boat_top", "props", "ui", "pollutants", "sky"] as const;
 export type AtlasName = (typeof ATLASES)[number];
-export const BACKGROUNDS = ["bg_dock", "bg_sea_jade", "bg_sea_azure", "bg_sea_indigo", "bg_sea_ink"] as const;
+export const BACKGROUNDS = ["bg_dock", "bg_dock_market", "bg_dock_salt", "bg_dock_village", "bg_sea_jade", "bg_sea_azure", "bg_sea_indigo", "bg_sea_ink"] as const;
 export type BgName = (typeof BACKGROUNDS)[number];
+
+/** Side-view island backgrounds share the dock's geometry (pier, waterline, seabed — bg_meta.dock),
+ *  so the hub and dock fishing use the same picture. Islands without their own art yet (M7) get a
+ *  plain village. */
+export function islandBg(islandId: string): BgName {
+  switch (islandId) {
+    case "red_lighthouse":
+      return "bg_dock";
+    case "water_market":
+      return "bg_dock_market";
+    case "salt_flower":
+      return "bg_dock_salt";
+    default:
+      return "bg_dock_village";
+  }
+}
 
 const HEX = NAMES.map((n) => COLORS[n]);
 /** 0xRRGGBB → palette index (1-based). */
@@ -118,6 +134,27 @@ export class Assets {
     if (!entry || sw <= 0 || sh <= 0 || dw <= 0 || dh <= 0) return;
     const f = this.frame(atlas, name);
     ctx.drawImage(this.source(`atlas:${atlas}`, entry.img, lut), f.x + sx, f.y + sy, sw, sh, Math.round(dx), Math.round(dy), Math.round(dw), Math.round(dh));
+  }
+
+  /** A frame as a flat silhouette in one color (도감: species not caught yet). Cached. */
+  drawSilhouette(ctx: CanvasRenderingContext2D, atlas: AtlasName, name: string, x: number, y: number, color: string): void {
+    const entry = this.atlases.get(atlas);
+    if (!entry) return;
+    const f = this.frame(atlas, name);
+    const key = `sil:${atlas}:${name}:${color}`;
+    let c = this.recolorCache.get(key);
+    if (!c) {
+      c = document.createElement("canvas");
+      c.width = f.w;
+      c.height = f.h;
+      const g = c.getContext("2d")!;
+      g.drawImage(entry.img, f.x, f.y, f.w, f.h, 0, 0, f.w, f.h);
+      g.globalCompositeOperation = "source-in";
+      g.fillStyle = color;
+      g.fillRect(0, 0, f.w, f.h);
+      this.recolorCache.set(key, c);
+    }
+    ctx.drawImage(c, Math.round(x), Math.round(y));
   }
 
   /** A full-screen background, recolored for the LUT. */
