@@ -1,8 +1,8 @@
-// Top-down sea map (design §3-3). Fully deterministic: the client draws it and the server can
-// recompute any tile (e.g. "was this cast on a deep tile?") from the same functions.
-// Layout: the start island on the west edge; the sea deepens eastward in four bands
-// (옥빛 → 청빛 → 남빛 → 먹빛), three islands per band, and 버려진 골 at the far east.
-// Island names/concepts are TBD (design §3-1) — ids and names below are placeholders.
+// Top-down sea map (design §3-1, §3-3). Fully deterministic: the client draws it and the server
+// can recompute any tile (e.g. "was this cast on a deep tile?") from the same functions.
+// Layout (design v11): 빨간등대 on the west edge and 검은등대 on the east edge face each other;
+// between them the sea deepens in four bands (옥빛 → 청빛 → 남빛 → 먹빛) with three islands each,
+// nearest first in unlock order; 버려진 골 lies just beyond 검은등대.
 
 import { hash32, stream } from "../rng";
 import type { SeaColor } from "./points";
@@ -13,60 +13,129 @@ export const MAP_H = 140; // tiles → 2240 px
 
 export const SEA_ORDER: readonly SeaColor[] = ["jade", "azure", "indigo", "ink"];
 export const SEA_NAME: Readonly<Record<SeaColor, string>> = { jade: "옥빛 바다", azure: "청빛 바다", indigo: "남빛 바다", ink: "먹빛 바다" };
-/** Hull level needed to enter each sea (design §3-2; ink also needs the lantern later). */
+/** Hull level needed to enter each sea (design §3-2; ink also needs the lantern). */
 export const SEA_HULL_LV: Readonly<Record<SeaColor, number>> = { jade: 1, azure: 2, indigo: 3, ink: 4 };
+
+/** What the island's natural ground looks like ("none" = a built structure on open water). */
+export type Ground = "grass" | "rock" | "darkrock" | "salt" | "black" | "junk" | "port" | "none";
+/** Built structures (tile units, relative to the island center; x/y = top-left). Solid for the boat. */
+export type Part = { x: number; y: number; w: number; h: number; mat: "raft" | "boat_red" | "boat_blue" | "boat_white" | "tower" | "deck" | "glass" | "hull" | "concrete" };
+/** Landmarks drawn on top (render only). */
+export type Deco =
+  | "lighthouse_red" | "lighthouse_black" | "stalls" | "saltpans" | "windmills" | "school_under"
+  | "bridge_houses" | "junk" | "cranes" | "containers" | "whalebone" | "rooftop" | "shrine" | "smoke" | "wreck";
 
 export type Island = {
   id: string;
   name: string;
   sea: SeaColor;
-  /** Center (tiles), radius (tiles), vertical squash (>1 = wider than tall). */
+  /** Unlock order inside its sea (design §3-1: nearest first). */
+  order: number;
+  /** Center (tiles), radius (tiles), horizontal stretch (>1 = wider than tall). */
   cx: number;
   cy: number;
   r: number;
   squash: number;
-  /** Where the boat ties up: a water tile at the end of the pier. */
+  ground: Ground;
+  parts: readonly Part[];
+  deco: readonly Deco[];
+  /** Houses drawn on the ground (0 = none). */
+  houses: number;
+  /** Where the boat ties up: a water tile facing 빨간등대. */
   dock: readonly [number, number];
   /** Dock fishing point (points.ts). */
   dockPoint: string;
-  /** Houses drawn on the top-down map (0 = uninhabited). */
-  houses: number;
-  lighthouse?: boolean;
 };
 
-type IslandDef = Omit<Island, "dock" | "dockPoint">;
-
-const START_DEF: IslandDef = { id: "start", name: "시작 섬", sea: "jade", cx: 20, cy: 70, r: 9, squash: 1.1, houses: 6, lighthouse: true };
+type IslandDef = Omit<Island, "dock" | "dockPoint" | "parts" | "deco"> & { parts?: readonly Part[]; deco?: readonly Deco[] };
 
 const DEFS: readonly IslandDef[] = [
-  START_DEF,
-  { id: "jade_i1", name: "옥빛 섬 1", sea: "jade", cx: 50, cy: 30, r: 6, squash: 1.3, houses: 4 },
-  { id: "jade_i2", name: "옥빛 섬 2", sea: "jade", cx: 60, cy: 82, r: 5, squash: 0.9, houses: 3 },
-  { id: "jade_i3", name: "옥빛 섬 3", sea: "jade", cx: 44, cy: 114, r: 7, squash: 1.2, houses: 5, lighthouse: true },
-  { id: "azure_i1", name: "청빛 섬 1", sea: "azure", cx: 94, cy: 20, r: 7, squash: 1.4, houses: 4 },
-  { id: "azure_i2", name: "청빛 섬 2", sea: "azure", cx: 102, cy: 72, r: 6, squash: 1.0, houses: 3, lighthouse: true },
-  { id: "azure_i3", name: "청빛 섬 3", sea: "azure", cx: 88, cy: 124, r: 5, squash: 1.3, houses: 2 },
-  { id: "indigo_i1", name: "남빛 섬 1", sea: "indigo", cx: 142, cy: 34, r: 6, squash: 1.1, houses: 3 },
-  { id: "indigo_i2", name: "남빛 섬 2", sea: "indigo", cx: 152, cy: 96, r: 7, squash: 1.5, houses: 4, lighthouse: true },
-  { id: "indigo_i3", name: "남빛 섬 3", sea: "indigo", cx: 128, cy: 128, r: 5, squash: 1.0, houses: 2 },
-  { id: "ink_i1", name: "먹빛 섬 1", sea: "ink", cx: 192, cy: 22, r: 5, squash: 1.2, houses: 1 },
-  { id: "ink_i2", name: "먹빛 섬 2", sea: "ink", cx: 200, cy: 98, r: 6, squash: 1.0, houses: 2, lighthouse: true },
-  { id: "ink_i3", name: "먹빛 섬 3", sea: "ink", cx: 182, cy: 130, r: 5, squash: 1.3, houses: 1 },
+  // 시작 — a small rock islet with the red lighthouse
+  { id: "red_lighthouse", name: "빨간등대", sea: "jade", order: 0, cx: 14, cy: 70, r: 3.4, squash: 1, ground: "rock", houses: 1, deco: ["lighthouse_red"] },
+  // 옥빛 — 1막 · 두려움
+  {
+    id: "water_market", name: "물장터", sea: "jade", order: 1, cx: 36, cy: 58, r: 4.5, squash: 1, ground: "none", houses: 0, deco: ["stalls"],
+    parts: [
+      { x: -2, y: -1.5, w: 4, h: 3, mat: "raft" },
+      { x: -1, y: -3.4, w: 2.2, h: 1.2, mat: "raft" },
+      { x: -0.9, y: 2.2, w: 2.2, h: 1.2, mat: "raft" },
+      { x: -4.6, y: -2.6, w: 2.4, h: 1.1, mat: "boat_red" },
+      { x: 2.3, y: -2.4, w: 2.6, h: 1.1, mat: "boat_blue" },
+      { x: 2.4, y: 1.4, w: 2.4, h: 1.1, mat: "boat_white" },
+      { x: -4.7, y: 1.5, w: 2.6, h: 1.1, mat: "boat_blue" },
+    ],
+  },
+  { id: "salt_flower", name: "소금꽃섬", sea: "jade", order: 2, cx: 47, cy: 94, r: 6.5, squash: 1.4, ground: "salt", houses: 3, deco: ["saltpans", "windmills"] },
+  {
+    id: "bell_tower", name: "종탑섬", sea: "jade", order: 3, cx: 62, cy: 62, r: 3, squash: 1, ground: "none", houses: 0, deco: ["school_under"],
+    parts: [
+      { x: -1, y: -1, w: 2, h: 2, mat: "tower" },
+      { x: -3.4, y: -0.5, w: 1.6, h: 1, mat: "raft" },
+      { x: 1.8, y: -0.5, w: 1.6, h: 1, mat: "raft" },
+      { x: -0.5, y: 1.8, w: 1, h: 1.4, mat: "raft" },
+    ],
+  },
+  // 청빛 — 2막 · 진실의 시작
+  {
+    id: "bridge_town", name: "다리섬", sea: "azure", order: 1, cx: 76, cy: 30, r: 3, squash: 1, ground: "none", houses: 0, deco: ["bridge_houses"],
+    parts: [
+      { x: -12, y: -1.2, w: 9.4, h: 2.4, mat: "deck" },
+      { x: -1.2, y: -1.2, w: 13, h: 2.4, mat: "deck" },
+    ],
+  },
+  { id: "junk_isle", name: "고물섬", sea: "azure", order: 2, cx: 90, cy: 112, r: 5.5, squash: 1.1, ground: "junk", houses: 2, deco: ["junk"] },
+  {
+    id: "rust_port", name: "녹슨항", sea: "azure", order: 3, cx: 114, cy: 62, r: 6, squash: 1.3, ground: "port", houses: 2, deco: ["containers", "cranes"],
+    parts: [
+      { x: -12.5, y: -3.2, w: 6, h: 1.4, mat: "concrete" },
+      { x: -12.5, y: 1.8, w: 6, h: 1.4, mat: "concrete" },
+    ],
+  },
+  // 남빛 — 2막 · 진실
+  { id: "whalebone", name: "고래뼈섬", sea: "indigo", order: 1, cx: 128, cy: 120, r: 6, squash: 1.35, ground: "grass", houses: 3, deco: ["whalebone"] },
+  {
+    id: "glass_tower", name: "유리탑섬", sea: "indigo", order: 2, cx: 145, cy: 24, r: 3.5, squash: 1, ground: "none", houses: 0, deco: ["rooftop"],
+    parts: [{ x: -3.5, y: -3.5, w: 7, h: 7, mat: "glass" }],
+  },
+  { id: "water_sound", name: "물소리섬", sea: "indigo", order: 3, cx: 166, cy: 84, r: 3.2, squash: 1, ground: "rock", houses: 0, deco: ["shrine"] },
+  // 먹빛 — 3막 · 상처
+  { id: "black_sand", name: "검은모래섬", sea: "ink", order: 1, cx: 181, cy: 26, r: 5.5, squash: 1.2, ground: "black", houses: 3, deco: ["smoke"] },
+  {
+    id: "taepyeong_grave", name: "태평호 무덤", sea: "ink", order: 2, cx: 188, cy: 120, r: 3, squash: 1, ground: "none", houses: 0, deco: ["wreck"],
+    parts: [
+      { x: -10, y: -2, w: 8.6, h: 4, mat: "hull" },
+      { x: 0.4, y: -1.6, w: 8.4, h: 3.6, mat: "hull" },
+    ],
+  },
+  { id: "black_lighthouse", name: "검은등대", sea: "ink", order: 3, cx: 201, cy: 70, r: 3.4, squash: 1, ground: "darkrock", houses: 1, deco: ["lighthouse_black"] },
 ];
 
-/** 버려진 골 — the old dumping ground at the far east (design §0-5, 3막). */
-export const VALLEY = { cx: 214, cy: 58, r: 9 } as const;
+/** 버려진 골 — the old dumping ground just past 검은등대 (design §0-5, 3막). */
+export const VALLEY = { cx: 215, cy: 70, r: 8 } as const;
 
-/** Dock on the side facing the start island (the start island docks to the east). */
+const START_DEF = DEFS[0]!;
+
+/** Outer reach of an island from its center along a unit direction (tiles). */
+function reach(d: IslandDef, ux: number, uy: number): number {
+  let r = d.ground === "none" ? 0 : d.r * Math.max(1, d.squash) * 1.05;
+  for (const p of d.parts ?? []) {
+    // farthest corner of the part along the direction
+    for (const [x, y] of [[p.x, p.y], [p.x + p.w, p.y], [p.x, p.y + p.h], [p.x + p.w, p.y + p.h]] as const) r = Math.max(r, x * ux + y * uy);
+  }
+  return r;
+}
+
+/** Dock on the side facing 빨간등대 (빨간등대 itself docks to the east, toward the sea). */
 function dockFor(d: IslandDef): [number, number] {
   let dx = START_DEF.cx - d.cx, dy = START_DEF.cy - d.cy;
   if (d.id === START_DEF.id) { dx = 1; dy = 0; }
   const len = Math.hypot(dx, dy) || 1;
-  const reach = d.r * Math.max(1, d.squash) + 3.5;
-  return [Math.round(d.cx + (dx / len) * reach), Math.round(d.cy + (dy / len) * reach)];
+  const ux = dx / len, uy = dy / len;
+  const r = reach(d, ux, uy) + (d.ground === "none" ? 1.5 : 3.5);
+  return [Math.round(d.cx + ux * r), Math.round(d.cy + uy * r)];
 }
 
-export const ISLANDS: readonly Island[] = DEFS.map((d) => ({ ...d, dock: dockFor(d), dockPoint: `${d.id}_dock` }));
+export const ISLANDS: readonly Island[] = DEFS.map((d) => ({ ...d, parts: d.parts ?? [], deco: d.deco ?? [], dock: dockFor(d), dockPoint: `${d.id}_dock` }));
 export const ISLAND_BY_ID: Readonly<Record<string, Island>> = Object.fromEntries(ISLANDS.map((i) => [i.id, i]));
 export const START_ISLAND = ISLANDS[0]!;
 
@@ -111,18 +180,19 @@ export function fbm(x: number, y: number, seed: number, octaves = 3): number {
   return v / n;
 }
 
-/** Zone depth 0…~1.1: distance from the start island, warped so borders wander. */
+/** Zone depth 0…~1.1: distance from 빨간등대, warped so borders wander. */
 export function depthAt(x: number, y: number): number {
   return Math.hypot(x - START_DEF.cx, y - START_DEF.cy) / 215 + (fbm(x / 16, y / 16, 11) - 0.5) * 0.2;
 }
 export const ZONE_CUTS = [0.28, 0.52, 0.76] as const;
 export const zoneOf = (depth: number) => (depth < ZONE_CUTS[0] ? 0 : depth < ZONE_CUTS[1] ? 1 : depth < ZONE_CUTS[2] ? 2 : 3);
 
-/** Nearest island in normalized distance: <0.78 grass, <1 beach, <1.4 shallows. */
+/** Nearest natural island in normalized distance: <0.78 ground, <1 beach, <1.4 shallows. */
 export function islandField(x: number, y: number): { d: number; island: number } {
   let best = 99, idx = -1;
   for (let k = 0; k < ISLANDS.length; k++) {
     const isl = ISLANDS[k]!;
+    if (isl.ground === "none") continue;
     const dx = (x - isl.cx) / isl.squash, dy = y - isl.cy;
     const raw = Math.hypot(dx, dy) / isl.r;
     if (raw > 1.9) continue; // far: skip the noise
@@ -132,6 +202,18 @@ export function islandField(x: number, y: number): { d: number; island: number }
   return { d: best, island: idx };
 }
 export const LAND = { grass: 0.78, sand: 1.0, shallow: 1.4 } as const;
+
+/** The built part at a point (tile units), if any. */
+export function partAt(x: number, y: number): { island: number; part: Part } | null {
+  for (let k = 0; k < ISLANDS.length; k++) {
+    const isl = ISLANDS[k]!;
+    for (const p of isl.parts) {
+      const lx = x - isl.cx, ly = y - isl.cy;
+      if (lx >= p.x && lx < p.x + p.w && ly >= p.y && ly < p.y + p.h) return { island: k, part: p };
+    }
+  }
+  return null;
+}
 
 /** Deep-pocket field; a tile is deep where this exceeds DEEP_CUT (and it's past the first sea). */
 export const deepField = (x: number, y: number) => fbm(x / 8, y / 8, 77);
@@ -147,6 +229,7 @@ export const enum Kind {
   Grass = 1,
   Sand = 2,
   Reef = 3,
+  /** Piers and built structures (rafts, decks, towers, the wreck). */
   Pier = 4,
 }
 export const FLAG_SHALLOW = 1;
@@ -170,6 +253,8 @@ export function seaGrid(): SeaGrid {
   if (cached) return cached;
   const n = MAP_W * MAP_H;
   const g: SeaGrid = { w: MAP_W, h: MAP_H, kind: new Uint8Array(n), sea: new Uint8Array(n), flags: new Uint8Array(n), points: [] };
+  const wreck = ISLANDS.find((i) => i.deco.includes("wreck"));
+  const school = ISLANDS.find((i) => i.deco.includes("school_under"));
   for (let ty = 0; ty < MAP_H; ty++)
     for (let tx = 0; tx < MAP_W; tx++) {
       const i = ty * MAP_W + tx;
@@ -180,15 +265,23 @@ export function seaGrid(): SeaGrid {
       if (land < LAND.grass) g.kind[i] = Kind.Grass;
       else if (land < LAND.sand) g.kind[i] = Kind.Sand;
       else if (land < LAND.shallow) g.flags[i] |= FLAG_SHALLOW;
+      if (partAt(x, y)) g.kind[i] = Kind.Pier;
       if (g.kind[i] !== Kind.Water) continue;
 
       const shallow = (g.flags[i]! & FLAG_SHALLOW) !== 0;
       if (g.sea[i]! >= 1 && !shallow && deepField(x, y) > DEEP_CUT) g.flags[i] |= FLAG_DEEP;
       if (Math.hypot(x - VALLEY.cx, y - VALLEY.cy) < VALLEY.r + (fbm(x / 4, y / 4, 13) - 0.5) * 4) g.flags[i] |= FLAG_VALLEY | FLAG_DEEP;
       if (g.sea[i] === 0 && !shallow && ruinsField(x, y) > RUINS_CUT) g.flags[i] |= FLAG_RUINS;
+      // the drowned school under 종탑섬
+      if (school && Math.abs(x - school.cx) < 6 && Math.abs(y - school.cy) < 4) g.flags[i] |= FLAG_RUINS;
       const border = ZONE_CUTS.some((c) => Math.abs(depth - c) < 0.02);
       const reefN = reefField(x, y);
       if ((shallow && reefN > 0.7) || (border && reefN > 0.66) || reefN > 0.8) g.kind[i] = Kind.Reef;
+      // the reef the 태평호 ran aground on
+      if (wreck) {
+        const d = Math.hypot((x - wreck.cx) / 1.6, y - wreck.cy);
+        if (d > 4 && d < 9 && reefN > 0.48) g.kind[i] = Kind.Reef;
+      }
     }
 
   const clear = (cx: number, cy: number, r: number) => {
@@ -199,14 +292,14 @@ export function seaGrid(): SeaGrid {
       }
   };
 
-  // docks: keep the approach clear and lay a pier back to the shore
+  // docks: keep the approach clear and lay a pier back to the island
   for (const isl of ISLANDS) {
-    clear(isl.dock[0], isl.dock[1], 4);
+    clear(isl.dock[0], isl.dock[1], 3);
     const vx = isl.cx - isl.dock[0], vy = isl.cy - isl.dock[1], len = Math.hypot(vx, vy);
-    for (let s = 1; s < 14; s++) {
+    for (let s = 1; s < 16; s++) {
       const x = Math.round(isl.dock[0] + (vx / len) * s), y = Math.round(isl.dock[1] + (vy / len) * s);
       const i = y * MAP_W + x;
-      if (g.kind[i] === Kind.Grass || g.kind[i] === Kind.Sand) break;
+      if (g.kind[i] !== Kind.Water && g.kind[i] !== Kind.Reef) break;
       g.kind[i] = Kind.Pier;
     }
   }
@@ -219,14 +312,14 @@ export function seaGrid(): SeaGrid {
 
 /** Seeded scatter: 5 points per sea, 2 over the drowned town, 1 in 버려진 골. */
 function placePoints(g: SeaGrid): MapPoint[] {
-  const r = stream(hash32("sea-points-v1"));
+  const r = stream(hash32("sea-points-v2"));
   const out: MapPoint[] = [];
   const looks: MapPoint["look"][] = ["boil", "birds", "buoy", "boil", "birds"];
   const ok = (tx: number, ty: number, spacing: number) => {
     if (tx < 4 || ty < 4 || tx >= MAP_W - 4 || ty >= MAP_H - 4) return false;
     const i = ty * MAP_W + tx;
     if (g.kind[i] !== Kind.Water || g.flags[i]! & FLAG_SHALLOW) return false;
-    for (const isl of ISLANDS) if (Math.hypot(tx - isl.cx, ty - isl.cy) < isl.r * Math.max(1, isl.squash) + 7) return false;
+    for (const isl of ISLANDS) if (Math.hypot(tx - isl.cx, ty - isl.cy) < Math.max(isl.r * Math.max(1, isl.squash), reach(isl, 1, 0), reach(isl, -1, 0)) + 6) return false;
     for (const p of out) if (Math.hypot(tx - p.tx, ty - p.ty) < spacing) return false;
     return true;
   };
@@ -240,7 +333,7 @@ function placePoints(g: SeaGrid): MapPoint[] {
   SEA_ORDER.forEach((sea, z) =>
     pick(5, (i) => g.sea[i] === z && !(g.flags[i]! & FLAG_VALLEY), (tx, ty, k) => ({ id: `p_${sea}_${k + 1}`, pointId: `${sea}_1`, tx, ty, look: looks[k]! })),
   );
-  pick(2, (i) => (g.flags[i]! & FLAG_RUINS) !== 0, (tx, ty, k) => ({ id: `p_ruins_${k + 1}`, pointId: "jade_1", tx, ty, look: "ruins" }), 16);
+  pick(2, (i) => (g.flags[i]! & FLAG_RUINS) !== 0 && g.sea[i] === 0, (tx, ty, k) => ({ id: `p_ruins_${k + 1}`, pointId: "jade_1", tx, ty, look: "ruins" }), 16);
   pick(1, (i) => (g.flags[i]! & FLAG_VALLEY) !== 0, (tx, ty) => ({ id: "p_valley", pointId: "ink_1", tx, ty, look: "boil" }), 8);
   return out;
 }
@@ -269,7 +362,7 @@ export function tileAt(tx: number, ty: number): TileInfo | null {
 /** Tile under a world-pixel position. */
 export const tileOfPx = (px: number, py: number): [number, number] => [Math.floor(px / TILE), Math.floor(py / TILE)];
 
-/** Solid for the boat: land, beach, reef, pier, or off the map. */
+/** Solid for the boat: land, beach, reef, pier/structure, or off the map. */
 export function isSolid(tx: number, ty: number): boolean {
   const t = tileAt(tx, ty);
   return !t || t.kind !== Kind.Water;

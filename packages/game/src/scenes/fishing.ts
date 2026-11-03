@@ -1,4 +1,4 @@
-import { FISH_BY_ID, GRADE_LABEL, omenCastIndex, POINT_BY_ID, rollCast, type CastRoll, type FishData, type FishingPoint } from "@sea/shared";
+import { FISH_BY_ID, GRADE_LABEL, omenCastIndex, POINT_BY_ID, rollCast, START_ISLAND, type CastRoll, type FishData, type FishingPoint } from "@sea/shared";
 import type { LutName } from "@sea/sprites/palette";
 import { lutHex, type BgName } from "../assets";
 import type { CastResult, FishingSession, GameBackend } from "../backend";
@@ -18,7 +18,7 @@ import { Clock } from "../systems/timeOfDay";
 export type SeaId = "jade" | "azure" | "indigo" | "ink";
 export type Spot = { kind: "dock" } | { kind: "boat"; sea: SeaId; hullLv: 1 | 2 | 3 | 4 };
 
-export const spotIdOf = (spot: Spot): string => (spot.kind === "dock" ? "start_dock" : `${spot.sea}_1`);
+export const spotIdOf = (spot: Spot): string => (spot.kind === "dock" ? START_ISLAND.dockPoint : `${spot.sea}_1`);
 
 const SEA_ORDER: SeaId[] = ["jade", "azure", "indigo", "ink"];
 const ROD_LEN = 34;

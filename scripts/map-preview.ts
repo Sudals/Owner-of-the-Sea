@@ -46,4 +46,14 @@ writePng(`${OUT}/map-start.png`, crop(Math.max(0, s.cx * TILE - 120), s.cy * TIL
 writePng(`${OUT}/map-east.png`, crop(WORLD_W - 700, 40 * TILE, 640, 360), 2);
 const ru = mapPoints().find((p) => p.look === "ruins")!;
 writePng(`${OUT}/map-ruins.png`, crop(ru.tx * TILE - 320, ru.ty * TILE - 180, 640, 360), 2);
-console.log("→ screenshots/map-overview.png, map-start.png, map-east.png, map-ruins.png");
+// every island side by side (1:1 crops) for review
+const CW = 224, CH = 168, COLS = 5;
+const sheet = new Img(CW * COLS, CH * Math.ceil(ISLANDS.length / COLS));
+ISLANDS.forEach((isl, k) => {
+  const ext = Math.max(...isl.parts.map((p) => Math.max(Math.abs(p.x), Math.abs(p.x + p.w))), 0);
+  const cx = (isl.cx - (ext > 8 ? Math.sign(isl.parts[0]!.x) * 3 : 0)) * TILE;
+  const c = crop(Math.round(cx - CW / 2), Math.round(isl.cy * TILE - CH / 2), CW, CH);
+  sheet.blit(c, (k % COLS) * CW, Math.floor(k / COLS) * CH);
+});
+writePng(`${OUT}/map-islands.png`, sheet);
+console.log("→ screenshots/map-overview.png, map-start.png, map-east.png, map-ruins.png, map-islands.png");
