@@ -77,15 +77,15 @@ const DEFS: readonly IslandDef[] = [
   },
   // 청빛 — 2막 · 진실의 시작
   {
-    id: "bridge_town", name: "다리섬", sea: "azure", order: 1, cx: 76, cy: 30, r: 3, squash: 1, ground: "none", houses: 0, deco: ["bridge_houses"],
+    id: "bridge", name: "다리섬", sea: "azure", order: 1, cx: 76, cy: 30, r: 3, squash: 1, ground: "none", houses: 0, deco: ["bridge_houses"],
     parts: [
       { x: -12, y: -1.2, w: 9.4, h: 2.4, mat: "deck" },
       { x: -1.2, y: -1.2, w: 13, h: 2.4, mat: "deck" },
     ],
   },
-  { id: "junk_isle", name: "고물섬", sea: "azure", order: 2, cx: 90, cy: 112, r: 5.5, squash: 1.1, ground: "junk", houses: 2, deco: ["junk"] },
+  { id: "junk", name: "고물섬", sea: "azure", order: 2, cx: 90, cy: 112, r: 5.5, squash: 1.1, ground: "junk", houses: 2, deco: ["junk"] },
   {
-    id: "rust_port", name: "녹슨항", sea: "azure", order: 3, cx: 114, cy: 62, r: 6, squash: 1.3, ground: "port", houses: 2, deco: ["containers", "cranes"],
+    id: "rusty_port", name: "녹슨항", sea: "azure", order: 3, cx: 114, cy: 62, r: 6, squash: 1.3, ground: "port", houses: 2, deco: ["containers", "cranes"],
     parts: [
       { x: -12.5, y: -3.2, w: 6, h: 1.4, mat: "concrete" },
       { x: -12.5, y: 1.8, w: 6, h: 1.4, mat: "concrete" },
@@ -101,7 +101,7 @@ const DEFS: readonly IslandDef[] = [
   // 먹빛 — 3막 · 상처
   { id: "black_sand", name: "검은모래섬", sea: "ink", order: 1, cx: 181, cy: 26, r: 5.5, squash: 1.2, ground: "black", houses: 3, deco: ["smoke"] },
   {
-    id: "taepyeong_grave", name: "태평호 무덤", sea: "ink", order: 2, cx: 188, cy: 120, r: 3, squash: 1, ground: "none", houses: 0, deco: ["wreck"],
+    id: "taepyeong_wreck", name: "태평호 무덤", sea: "ink", order: 2, cx: 188, cy: 120, r: 3, squash: 1, ground: "none", houses: 0, deco: ["wreck"],
     parts: [
       { x: -10, y: -2, w: 8.6, h: 4, mat: "hull" },
       { x: 0.4, y: -1.6, w: 8.4, h: 3.6, mat: "hull" },

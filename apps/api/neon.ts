@@ -4,7 +4,7 @@ import { defineConfig } from "@neon/config/v1";
 // Apply with `neon deploy --env .env.local` (function env reads process.env).
 
 export default defineConfig({
-  auth: false, // own username/password accounts (design §5), not Neon Auth
+  auth: false, // own name-only accounts until Steam (design §5), not Neon Auth
   buckets: {
     // 어탁(trophy card) images; private, served via presigned URLs
     assets: { access: "private" },

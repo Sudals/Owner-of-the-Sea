@@ -1,13 +1,14 @@
 import { createHmac, randomBytes } from "node:crypto";
+import { RECOVERY_ALPHABET } from "@sea/shared";
 import { and, eq, gt, sql } from "drizzle-orm";
 import { db, type DbLike } from "../db/pool";
 import { accounts, sessions } from "../db/schema";
 
-// Design §5-1: random 32-byte token; the DB stores only its keyed hash
-// (HMAC-SHA256 with SESSION_PEPPER, so a leaked table alone can't be replayed);
-// 30-day expiry that slides on every use.
+// Design §5-1: random 32-byte device token; the DB stores only its keyed hash
+// (HMAC-SHA256 with SESSION_PEPPER, so a leaked table alone can't be replayed).
+// There is no password to sign in again with, so the token lives long: 365 days, sliding on use.
 
-export const SESSION_TTL_DAYS = 30;
+export const SESSION_TTL_DAYS = 365;
 const TOKEN_RE = /^[A-Za-z0-9_-]{43}$/; // base64url of 32 bytes
 
 function pepper(): string {
@@ -18,6 +19,26 @@ function pepper(): string {
 
 export function hashToken(token: string): string {
   return createHmac("sha256", pepper()).update(token).digest("hex");
+}
+
+/** 이어하기 코드: 80 random bits as 16 Crockford base32 chars, XXXX-XXXX-XXXX-XXXX. */
+export function newRecoveryCode(): string {
+  const bytes = randomBytes(10);
+  let bits = 0, acc = 0, out = "";
+  for (const b of bytes) {
+    acc = (acc << 8) | b;
+    bits += 8;
+    while (bits >= 5) {
+      bits -= 5;
+      out += RECOVERY_ALPHABET[(acc >> bits) & 31];
+    }
+  }
+  return out.match(/.{4}/g)!.join("-");
+}
+
+/** Keyed hash of a normalized code (domain-separated from session tokens). */
+export function hashRecoveryCode(code: string): string {
+  return createHmac("sha256", pepper()).update(`recovery:${code}`).digest("hex");
 }
 
 export async function createSession(

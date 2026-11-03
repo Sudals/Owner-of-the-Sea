@@ -20,7 +20,6 @@
     "@neon/functions": "^0.11.0",
     "@sea/shared": "workspace:^",
     "drizzle-orm": "^0.45.4",
-    "hash-wasm": "^4.12.0",
     "hono": "^4.13.16",
     "pg": "^8.23.1",
     "zod": "^4"

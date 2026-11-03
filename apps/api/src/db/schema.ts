@@ -17,7 +17,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { bytea, citext } from "./types";
 
-// Design v6 §8. Accounts are our own (no Neon Auth).
+// Design §8. Accounts are our own (no Neon Auth): a name, no password, until Steam (§5).
 
 const createdAt = (name = "created_at") => timestamp(name, { withTimezone: true }).notNull().defaultNow();
 const maybeTime = (name: string) => timestamp(name, { withTimezone: true });
@@ -30,10 +30,10 @@ const accountRef = (name = "account_id") =>
 
 export const accounts = pgTable("accounts", {
   id: uuid("id").primaryKey().defaultRandom(),
-  username: citext("username").notNull().unique(),
-  passwordHash: text("password_hash").notNull(),
-  // citext too, so "Bob" and "bob" can't both appear on the leaderboard.
+  // The player's name (design §5) — citext, so "Bob" and "bob" can't both appear on the leaderboard.
   nickname: citext("nickname").notNull().unique(),
+  /** HMAC of the 이어하기 코드 (moves the save to another PC). Null only if never issued. */
+  recoveryHash: text("recovery_hash").unique(),
   steamId: text("steam_id").unique(),
   banned: boolean("banned").notNull().default(false),
   createdAt: createdAt(),
@@ -55,7 +55,7 @@ export const sessions = pgTable(
   (t) => [index("sessions_account_idx").on(t.accountId), index("sessions_expires_idx").on(t.expiresAt)],
 );
 
-/** key: 'login:<username>' | 'ip:<ip>' */
+/** key: 'start:<ip>' (names made) | 'recover:<ip>' (wrong 이어하기 코드) */
 export const authThrottle = pgTable("auth_throttle", {
   key: text("key").primaryKey(),
   failCount: integer("fail_count").notNull().default(0),

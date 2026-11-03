@@ -1,9 +1,10 @@
-// New-account starting state. Islands are TBD (design §3-1); `tbd_1` is the
-// placeholder id for the starting island until the island list is decided.
+import { START_ISLAND } from "./seaMap";
 
-export const START_ISLAND_ID = "tbd_1";
+// New-player starting state (design §3-1: everyone starts at 빨간등대).
 
-/** Initial numbers — tune freely; they are only applied at signup. */
+export const START_ISLAND_ID = START_ISLAND.id;
+
+/** Initial numbers — tune freely; they are only applied when a player starts. */
 export const STARTING_PLAYER = {
   gold: 100,
   day: 1,

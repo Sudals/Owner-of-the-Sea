@@ -4,9 +4,8 @@ import { z } from "zod";
 export const API_ERROR_CODES = [
   "invalid_json",
   "invalid_input",
-  "username_taken",
-  "nickname_taken",
-  "invalid_credentials",
+  "name_taken",
+  "invalid_code",
   "locked",
   "unauthorized",
   "banned",

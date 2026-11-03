@@ -1,63 +1,50 @@
 import { z } from "zod";
 
-// Account rules — design §5-1. Shared by client forms and server routes.
+// Identity until the Steam release — design §5. A player types a name and plays: no password.
+// This device keeps a long-lived token; an "이어하기 코드" moves the save to another PC.
+// Shared by the client (lobby name entry) and the server routes.
 
-export const USERNAME_RE = /^[a-z0-9_]{4,20}$/;
-export const NICKNAME_RE = /^[가-힣a-zA-Z0-9]{2,12}$/;
+export const NAME_RE = /^[가-힣a-zA-Z0-9]{2,12}$/;
+export const NAME_MAX = 12;
 
-/** 4–20 chars, lowercase letters/digits/_. Case-insensitive: input is lowercased. */
-export const usernameSchema = z
+/** 2–12 chars of Hangul syllables, Latin letters, digits. Unique (case-insensitive), shown on leaderboards. */
+export const nameSchema = z
   .string()
   .trim()
-  .toLowerCase()
-  .regex(USERNAME_RE, { error: "아이디는 4~20자의 영문, 숫자, _만 쓸 수 있어요." });
+  .regex(NAME_RE, { error: "이름은 2~12자의 한글, 영문, 숫자만 쓸 수 있어요." });
 
-/** 8–64 chars, must mix letters and digits. */
-export const passwordSchema = z
+// ── 이어하기 코드 ──
+// 16 Crockford base32 chars (80 bits) in groups of four: XXXX-XXXX-XXXX-XXXX.
+// No I/L/O/U, so it survives being read aloud or copied by hand.
+
+export const RECOVERY_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+export const RECOVERY_RE = /^[0-9A-HJKMNP-TV-Z]{4}(?:-[0-9A-HJKMNP-TV-Z]{4}){3}$/;
+
+/** Uppercases, drops spaces/dashes, maps look-alikes (I/L→1, O→0), regroups by four. */
+export function normalizeRecoveryCode(input: string): string {
+  const raw = input.toUpperCase().replace(/[\s-]/g, "").replace(/[IL]/g, "1").replace(/O/g, "0");
+  return raw.match(/.{1,4}/g)?.join("-") ?? "";
+}
+
+export const recoveryCodeSchema = z
   .string()
-  .min(8, { error: "비밀번호는 8자 이상이어야 해요." })
-  .max(64, { error: "비밀번호는 64자 이하여야 해요." })
-  .regex(/[A-Za-z]/, { error: "비밀번호에 영문을 하나 이상 넣어 주세요." })
-  .regex(/[0-9]/, { error: "비밀번호에 숫자를 하나 이상 넣어 주세요." });
+  .max(64)
+  .transform(normalizeRecoveryCode)
+  .pipe(z.string().regex(RECOVERY_RE, { error: "이어하기 코드 16자리를 확인해 주세요." }));
 
-/** 2–12 chars of Hangul syllables, Latin letters, digits. Shown on leaderboards. */
-export const nicknameSchema = z
-  .string()
-  .trim()
-  .regex(NICKNAME_RE, { error: "닉네임은 2~12자의 한글, 영문, 숫자만 쓸 수 있어요." });
+// ── Requests ──
 
-export const signupRequest = z.object({
-  username: usernameSchema,
-  password: passwordSchema,
-  nickname: nicknameSchema,
-});
+export const startRequest = z.object({ name: nameSchema });
+export const recoverRequest = z.object({ code: recoveryCodeSchema });
 
-// Login only bounds the input; format rules would leak which part is wrong.
-export const loginRequest = z.object({
-  username: z.string().trim().toLowerCase().min(1).max(64),
-  password: z.string().min(1).max(128),
-});
-
-export const passwordChangeRequest = z
-  .object({
-    current: z.string().min(1).max(128),
-    next: passwordSchema,
-  })
-  .refine((d) => d.current !== d.next, {
-    error: "새 비밀번호가 기존 비밀번호와 같아요.",
-    path: ["next"],
-  });
-
-export type SignupRequest = z.infer<typeof signupRequest>;
-export type LoginRequest = z.infer<typeof loginRequest>;
-export type PasswordChangeRequest = z.infer<typeof passwordChangeRequest>;
+export type StartRequest = z.infer<typeof startRequest>;
+export type RecoverRequest = z.infer<typeof recoverRequest>;
 
 // ── Responses ──
 
 export const accountDto = z.object({
   id: z.string().uuid(),
-  username: z.string(),
-  nickname: z.string(),
+  name: z.string(),
   createdAt: z.string(),
 });
 
@@ -65,6 +52,8 @@ export const authResponse = z.object({
   token: z.string(),
   expiresAt: z.string(),
   account: accountDto,
+  /** Only when a code is (re)issued: `/start` and `/recovery-code`. The server keeps just its hash. */
+  recoveryCode: z.string().optional(),
 });
 
 export type AccountDto = z.infer<typeof accountDto>;

@@ -15,6 +15,20 @@
       "when": 1793670210660,
       "tag": "0001_init",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793678087889,
+      "tag": "0002_drop_password",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793678099852,
+      "tag": "0003_recovery_code",
+      "breakpoints": true
     }
   ]
 }
