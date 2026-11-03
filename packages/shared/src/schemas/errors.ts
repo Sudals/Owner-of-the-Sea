@@ -11,6 +11,8 @@ export const API_ERROR_CODES = [
   "banned",
   "forbidden",
   "not_found",
+  "bad_spot",
+  "offline",
   "internal",
 ] as const;
 

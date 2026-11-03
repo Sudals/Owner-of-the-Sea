@@ -4,6 +4,8 @@ import { apiError, internalError } from "./http";
 import { authRoutes } from "./routes/auth";
 import { healthRoutes } from "./routes/health";
 import { meRoutes } from "./routes/me";
+import { saveRoutes } from "./routes/save";
+import { sessionRoutes } from "./routes/session";
 import { triggerRoutes } from "./routes/triggers";
 
 // 바다의 주인 API — Hono on Neon Functions (design §7, §10-0). A Hono app is a
@@ -30,6 +32,8 @@ app.use(
 app.get("/", (c) => c.json({ name: "바다의 주인 API", branch: process.env.NEON_BRANCH ?? null }));
 app.route("/auth", authRoutes);
 app.route("/me", meRoutes);
+app.route("/session", sessionRoutes);
+app.route("/save", saveRoutes);
 app.route("/health", healthRoutes);
 app.route("/triggers", triggerRoutes);
 

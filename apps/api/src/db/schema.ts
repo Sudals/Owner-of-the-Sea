@@ -78,9 +78,20 @@ export const players = pgTable(
     lineLv: integer("line_lv").notNull().default(1),
     hullLv: integer("hull_lv").notNull().default(1),
     hullHp: integer("hull_hp").notNull(),
-    fuel: integer("fuel").notNull(),
+    fuel: real("fuel").notNull(),
     hasLantern: boolean("has_lantern").notNull().default(false),
+    fuelTank: boolean("fuel_tank").notNull().default(false),
     iceLv: integer("ice_lv").notNull().default(0),
+    // Out at sea when saved (design §8): boat position in world px; null while tied up at an island.
+    seaX: real("sea_x"),
+    seaY: real("sea_y"),
+    seaHeading: real("sea_heading"),
+    /** Game clock 0–24 (the day is `day`). */
+    gameHour: real("game_hour").notNull().default(9),
+    /** Seconds at sea, all-time — the freshness clock (design §3-3). */
+    seaTime: real("sea_time").notNull().default(0),
+    /** 해도 fog of war: one bit per map tile, base64 (~5 KB). */
+    chart: text("chart").notNull().default(""),
     /** Unsold fish in the hold (capped by hold capacity) — design §8 용량 절약 원칙. */
     cargo: jsonb("cargo").$type<CargoItem[]>().notNull().default([]),
     storyFlags: jsonb("story_flags").$type<Record<string, unknown>>().notNull().default({}),
@@ -90,7 +101,10 @@ export const players = pgTable(
   (t) => [check("players_gold_nonneg", sql`${t.gold} >= 0`)],
 );
 
-export type CargoItem = { fishId: string; sizeCm: number; caughtAt: string; spotId: string };
+/** `id` = `${sessionId}:${castIndex}`; `freshAt` = players.sea_time when caught. */
+export type CargoItem = { id: string; fishId: string; sizeCm: number; caughtAt: string; spotId: string; freshAt?: number };
+
+export type CastConds = { deep: boolean; storm: boolean };
 
 export type Omen = { tier: "C" | "B" | "A" | "S" | "SS"; castsLeft: number; spotId?: string; createdAt: string };
 
@@ -140,6 +154,10 @@ export const fishSessions = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     accountId: accountRef(),
     spotId: text("spot_id").notNull(),
+    /** Species pool the casts roll from (points.ts). */
+    pointId: text("point_id").notNull(),
+    /** Deep tile / storm, fixed when the session opened (the server read them from the position). */
+    conds: jsonb("conds").$type<CastConds>().notNull().default({ deep: false, storm: false }),
     seed: bytea("seed").notNull(),
     nextIndex: integer("next_index").notNull().default(0),
     createdAt: createdAt(),
