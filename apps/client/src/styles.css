@@ -1,0 +1,51 @@
+:root {
+  --ink: #0d0f1c;
+  --navy: #1b1e36;
+  --foam: #eff4f8;
+  --sand: #f1d08b;
+  --muted: #8b94a7;
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--ink); /* letterbox around the integer-scaled canvas */
+  color: var(--foam);
+  font-family: "Galmuri11", system-ui, sans-serif;
+  -webkit-font-smoothing: none;
+  overflow: hidden;
+}
+
+.game-host {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+.loading {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-size: 16px;
+}
+
+.error {
+  color: #e66850;
+  padding: 16px;
+  white-space: pre-wrap;
+}

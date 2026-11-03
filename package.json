@@ -7,12 +7,19 @@
     "node": ">=22"
   },
   "scripts": {
-    "dev": "pnpm --filter @sea/api dev",
+    "dev": "pnpm --parallel --filter @sea/api --filter @sea/client dev",
+    "dev:client": "pnpm --filter @sea/client dev",
+    "dev:demo": "pnpm --filter @sea/client dev:demo",
+    "dev:api": "pnpm --filter @sea/api dev",
     "build": "pnpm -r run build",
     "typecheck": "pnpm -r run typecheck",
     "sprites": "pnpm --filter @sea/sprites sprites",
+    "screenshot": "node scripts/screenshot.mjs",
     "db:generate": "pnpm --filter @sea/api db:generate",
     "db:migrate": "pnpm --filter @sea/api db:migrate",
     "deploy:api": "pnpm --filter @sea/api deploy"
+  },
+  "devDependencies": {
+    "playwright": "1.64.1"
   }
 }

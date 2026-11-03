@@ -1,0 +1,20 @@
+{
+  "name": "@sea/game",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Pure TypeScript game engine — no React, Electron or server (design §7-1)",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@sea/shared": "workspace:^",
+    "@sea/sprites": "workspace:^"
+  },
+  "devDependencies": {
+    "typescript": "^6"
+  }
+}

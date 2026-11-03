@@ -27,3 +27,6 @@ Thumbs.db
 
 # sprite review renders (regenerate with `pnpm sprites`)
 packages/sprites/preview/
+
+# build output
+dist/
