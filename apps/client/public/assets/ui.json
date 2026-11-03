@@ -1,0 +1,206 @@
+{
+ "image": "ui.png",
+ "frames": {
+  "gauge_v": {
+   "x": 1,
+   "y": 1,
+   "w": 8,
+   "h": 40,
+   "anchor": {
+    "slice": [
+     3,
+     3
+    ]
+   }
+  },
+  "panel_wood": {
+   "x": 10,
+   "y": 1,
+   "w": 24,
+   "h": 24,
+   "anchor": {
+    "slice": [
+     8,
+     8
+    ]
+   }
+  },
+  "panel_sea": {
+   "x": 35,
+   "y": 1,
+   "w": 24,
+   "h": 24,
+   "anchor": {
+    "slice": [
+     8,
+     8
+    ]
+   }
+  },
+  "panel_paper": {
+   "x": 60,
+   "y": 1,
+   "w": 24,
+   "h": 24,
+   "anchor": {
+    "slice": [
+     8,
+     8
+    ]
+   }
+  },
+  "icon_gold": {
+   "x": 85,
+   "y": 1,
+   "w": 16,
+   "h": 16
+  },
+  "icon_dex": {
+   "x": 102,
+   "y": 1,
+   "w": 16,
+   "h": 16
+  },
+  "icon_shop": {
+   "x": 119,
+   "y": 1,
+   "w": 16,
+   "h": 16
+  },
+  "icon_save": {
+   "x": 136,
+   "y": 1,
+   "w": 16,
+   "h": 16
+  },
+  "icon_fuel": {
+   "x": 153,
+   "y": 1,
+   "w": 16,
+   "h": 16
+  },
+  "icon_repair": {
+   "x": 170,
+   "y": 1,
+   "w": 16,
+   "h": 16
+  },
+  "icon_clear": {
+   "x": 187,
+   "y": 1,
+   "w": 16,
+   "h": 16
+  },
+  "icon_storm": {
+   "x": 204,
+   "y": 1,
+   "w": 16,
+   "h": 16
+  },
+  "icon_omen": {
+   "x": 221,
+   "y": 1,
+   "w": 16,
+   "h": 16
+  },
+  "icon_settings": {
+   "x": 238,
+   "y": 1,
+   "w": 16,
+   "h": 16
+  },
+  "icon_star": {
+   "x": 255,
+   "y": 1,
+   "w": 16,
+   "h": 16
+  },
+  "icon_title_scale": {
+   "x": 272,
+   "y": 1,
+   "w": 16,
+   "h": 16
+  },
+  "icon_lock": {
+   "x": 289,
+   "y": 1,
+   "w": 16,
+   "h": 16
+  },
+  "icon_journal": {
+   "x": 306,
+   "y": 1,
+   "w": 16,
+   "h": 16
+  },
+  "icon_compass": {
+   "x": 323,
+   "y": 1,
+   "w": 16,
+   "h": 16
+  },
+  "button_normal": {
+   "x": 340,
+   "y": 1,
+   "w": 40,
+   "h": 14,
+   "anchor": {
+    "slice": [
+     4,
+     4
+    ]
+   }
+  },
+  "button_hover": {
+   "x": 381,
+   "y": 1,
+   "w": 40,
+   "h": 14,
+   "anchor": {
+    "slice": [
+     4,
+     4
+    ]
+   }
+  },
+  "button_pressed": {
+   "x": 422,
+   "y": 1,
+   "w": 40,
+   "h": 14,
+   "anchor": {
+    "slice": [
+     4,
+     4
+    ]
+   }
+  },
+  "button_disabled": {
+   "x": 463,
+   "y": 1,
+   "w": 40,
+   "h": 14,
+   "anchor": {
+    "slice": [
+     4,
+     4
+    ]
+   }
+  },
+  "gauge_h": {
+   "x": 1,
+   "y": 42,
+   "w": 52,
+   "h": 8,
+   "anchor": {
+    "slice": [
+     3,
+     3
+    ]
+   }
+  }
+ },
+ "meta": {
+  "anchors": "slice = 9-slice corner size [x, y]"
+ }
+}

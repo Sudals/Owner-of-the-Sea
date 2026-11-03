@@ -1,0 +1,56 @@
+{
+ "image": "boat.png",
+ "frames": {
+  "boat_lv1": {
+   "x": 1,
+   "y": 1,
+   "w": 64,
+   "h": 32,
+   "anchor": {
+    "stand": [
+     44,
+     18
+    ]
+   }
+  },
+  "boat_lv2": {
+   "x": 66,
+   "y": 1,
+   "w": 64,
+   "h": 32,
+   "anchor": {
+    "stand": [
+     44,
+     18
+    ]
+   }
+  },
+  "boat_lv3": {
+   "x": 131,
+   "y": 1,
+   "w": 64,
+   "h": 32,
+   "anchor": {
+    "stand": [
+     44,
+     18
+    ]
+   }
+  },
+  "boat_lv4": {
+   "x": 196,
+   "y": 1,
+   "w": 64,
+   "h": 32,
+   "anchor": {
+    "stand": [
+     44,
+     18
+    ]
+   }
+  }
+ },
+ "meta": {
+  "anchors": "stand = angler feet on deck"
+ }
+}

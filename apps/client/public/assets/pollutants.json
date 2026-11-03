@@ -1,0 +1,97 @@
+{
+ "image": "pollutants.png",
+ "frames": {
+  "drum_whale": {
+   "x": 1,
+   "y": 1,
+   "w": 128,
+   "h": 56
+  },
+  "net_shark": {
+   "x": 130,
+   "y": 1,
+   "w": 135,
+   "h": 49
+  },
+  "net_shark_purified": {
+   "x": 266,
+   "y": 1,
+   "w": 101,
+   "h": 41,
+   "anchor": {
+    "mouth": [
+     99,
+     25
+    ]
+   }
+  },
+  "drum_whale_purified": {
+   "x": 368,
+   "y": 1,
+   "w": 122,
+   "h": 34,
+   "anchor": {
+    "mouth": [
+     120,
+     21
+    ]
+   }
+  },
+  "oil_mackerel_king": {
+   "x": 1,
+   "y": 58,
+   "w": 74,
+   "h": 33
+  },
+  "plastic_mullet": {
+   "x": 76,
+   "y": 58,
+   "w": 60,
+   "h": 27
+  },
+  "oil_mackerel_king_purified": {
+   "x": 137,
+   "y": 58,
+   "w": 74,
+   "h": 27,
+   "anchor": {
+    "mouth": [
+     72,
+     16
+    ]
+   }
+  },
+  "plastic_mullet_purified": {
+   "x": 212,
+   "y": 58,
+   "w": 52,
+   "h": 21,
+   "anchor": {
+    "mouth": [
+     50,
+     12
+    ]
+   }
+  }
+ },
+ "meta": {
+  "bosses": {
+   "plastic_mullet": {
+    "name": "비닐감긴 숭어",
+    "tier": "C"
+   },
+   "oil_mackerel_king": {
+    "name": "기름먹은 고등어떼왕",
+    "tier": "B"
+   },
+   "net_shark": {
+    "name": "그물을 끄는 상어",
+    "tier": "A"
+   },
+   "drum_whale": {
+    "name": "드럼통 고래",
+    "tier": "S"
+   }
+  }
+ }
+}

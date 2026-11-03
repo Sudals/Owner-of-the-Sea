@@ -1,0 +1,649 @@
+{
+ "image": "fish.png",
+ "frames": {
+  "sunfish": {
+   "x": 1,
+   "y": 1,
+   "w": 32,
+   "h": 32,
+   "anchor": {
+    "mouth": [
+     30,
+     16
+    ]
+   }
+  },
+  "bluefin_tuna": {
+   "x": 34,
+   "y": 1,
+   "w": 56,
+   "h": 24,
+   "anchor": {
+    "mouth": [
+     54,
+     13
+    ]
+   }
+  },
+  "anglerfish": {
+   "x": 91,
+   "y": 1,
+   "w": 36,
+   "h": 23,
+   "anchor": {
+    "mouth": [
+     31,
+     16
+    ]
+   }
+  },
+  "yellowtail": {
+   "x": 128,
+   "y": 1,
+   "w": 50,
+   "h": 22,
+   "anchor": {
+    "mouth": [
+     48,
+     12
+    ]
+   }
+  },
+  "skipjack": {
+   "x": 179,
+   "y": 1,
+   "w": 50,
+   "h": 22,
+   "anchor": {
+    "mouth": [
+     48,
+     12
+    ]
+   }
+  },
+  "sea_bass": {
+   "x": 230,
+   "y": 1,
+   "w": 44,
+   "h": 20,
+   "anchor": {
+    "mouth": [
+     42,
+     11
+    ]
+   }
+  },
+  "salmon": {
+   "x": 275,
+   "y": 1,
+   "w": 44,
+   "h": 20,
+   "anchor": {
+    "mouth": [
+     42,
+     11
+    ]
+   }
+  },
+  "spanish_mackerel": {
+   "x": 320,
+   "y": 1,
+   "w": 52,
+   "h": 20,
+   "anchor": {
+    "mouth": [
+     50,
+     10
+    ]
+   }
+  },
+  "lantern_angler": {
+   "x": 373,
+   "y": 1,
+   "w": 32,
+   "h": 20,
+   "anchor": {
+    "mouth": [
+     26,
+     14
+    ]
+   }
+  },
+  "mackerel": {
+   "x": 406,
+   "y": 1,
+   "w": 40,
+   "h": 18,
+   "anchor": {
+    "mouth": [
+     38,
+     10
+    ]
+   }
+  },
+  "mullet": {
+   "x": 447,
+   "y": 1,
+   "w": 42,
+   "h": 18,
+   "anchor": {
+    "mouth": [
+     40,
+     10
+    ]
+   }
+  },
+  "red_seabream": {
+   "x": 1,
+   "y": 34,
+   "w": 28,
+   "h": 17,
+   "anchor": {
+    "mouth": [
+     26,
+     10
+    ]
+   }
+  },
+  "black_seabream": {
+   "x": 30,
+   "y": 34,
+   "w": 28,
+   "h": 17,
+   "anchor": {
+    "mouth": [
+     26,
+     10
+    ]
+   }
+  },
+  "striped_beakfish": {
+   "x": 59,
+   "y": 34,
+   "w": 28,
+   "h": 17,
+   "anchor": {
+    "mouth": [
+     26,
+     10
+    ]
+   }
+  },
+  "filefish": {
+   "x": 88,
+   "y": 34,
+   "w": 28,
+   "h": 17,
+   "anchor": {
+    "mouth": [
+     26,
+     10
+    ]
+   }
+  },
+  "opaleye": {
+   "x": 117,
+   "y": 34,
+   "w": 28,
+   "h": 17,
+   "anchor": {
+    "mouth": [
+     26,
+     10
+    ]
+   }
+  },
+  "koi": {
+   "x": 146,
+   "y": 34,
+   "w": 28,
+   "h": 17,
+   "anchor": {
+    "mouth": [
+     26,
+     10
+    ]
+   }
+  },
+  "golden_seabream": {
+   "x": 175,
+   "y": 34,
+   "w": 28,
+   "h": 17,
+   "anchor": {
+    "mouth": [
+     26,
+     10
+    ]
+   }
+  },
+  "horse_mackerel": {
+   "x": 204,
+   "y": 34,
+   "w": 38,
+   "h": 17,
+   "anchor": {
+    "mouth": [
+     36,
+     10
+    ]
+   }
+  },
+  "rockfish": {
+   "x": 243,
+   "y": 34,
+   "w": 37,
+   "h": 17,
+   "anchor": {
+    "mouth": [
+     35,
+     11
+    ]
+   }
+  },
+  "scorpionfish": {
+   "x": 281,
+   "y": 34,
+   "w": 37,
+   "h": 17,
+   "anchor": {
+    "mouth": [
+     35,
+     11
+    ]
+   }
+  },
+  "greenling": {
+   "x": 319,
+   "y": 34,
+   "w": 37,
+   "h": 17,
+   "anchor": {
+    "mouth": [
+     35,
+     11
+    ]
+   }
+  },
+  "dark_rockfish": {
+   "x": 357,
+   "y": 34,
+   "w": 37,
+   "h": 17,
+   "anchor": {
+    "mouth": [
+     35,
+     11
+    ]
+   }
+  },
+  "porcupinefish": {
+   "x": 395,
+   "y": 34,
+   "w": 23,
+   "h": 16,
+   "anchor": {
+    "mouth": [
+     21,
+     8
+    ]
+   }
+  },
+  "catfish": {
+   "x": 419,
+   "y": 34,
+   "w": 38,
+   "h": 15,
+   "anchor": {
+    "mouth": [
+     34,
+     10
+    ]
+   }
+  },
+  "pufferfish": {
+   "x": 458,
+   "y": 34,
+   "w": 23,
+   "h": 14,
+   "anchor": {
+    "mouth": [
+     21,
+     7
+    ]
+   }
+  },
+  "moray": {
+   "x": 1,
+   "y": 52,
+   "w": 50,
+   "h": 13,
+   "anchor": {
+    "mouth": [
+     48,
+     7
+    ]
+   }
+  },
+  "grass_puffer": {
+   "x": 52,
+   "y": 52,
+   "w": 20,
+   "h": 13,
+   "anchor": {
+    "mouth": [
+     18,
+     6
+    ]
+   }
+  },
+  "conger": {
+   "x": 73,
+   "y": 52,
+   "w": 50,
+   "h": 12,
+   "anchor": {
+    "mouth": [
+     48,
+     7
+    ]
+   }
+  },
+  "pike_conger": {
+   "x": 124,
+   "y": 52,
+   "w": 50,
+   "h": 12,
+   "anchor": {
+    "mouth": [
+     48,
+     7
+    ]
+   }
+  },
+  "cutlassfish": {
+   "x": 175,
+   "y": 52,
+   "w": 50,
+   "h": 12,
+   "anchor": {
+    "mouth": [
+     48,
+     7
+    ]
+   }
+  },
+  "ghost_cutlass": {
+   "x": 226,
+   "y": 52,
+   "w": 50,
+   "h": 12,
+   "anchor": {
+    "mouth": [
+     48,
+     7
+    ]
+   }
+  },
+  "anchovy": {
+   "x": 277,
+   "y": 52,
+   "w": 18,
+   "h": 9,
+   "anchor": {
+    "mouth": [
+     16,
+     5
+    ]
+   }
+  },
+  "sardine": {
+   "x": 296,
+   "y": 52,
+   "w": 18,
+   "h": 9,
+   "anchor": {
+    "mouth": [
+     16,
+     5
+    ]
+   }
+  },
+  "gizzard_shad": {
+   "x": 315,
+   "y": 52,
+   "w": 18,
+   "h": 9,
+   "anchor": {
+    "mouth": [
+     16,
+     5
+    ]
+   }
+  },
+  "herring": {
+   "x": 334,
+   "y": 52,
+   "w": 18,
+   "h": 9,
+   "anchor": {
+    "mouth": [
+     16,
+     5
+    ]
+   }
+  },
+  "goby": {
+   "x": 353,
+   "y": 52,
+   "w": 18,
+   "h": 9,
+   "anchor": {
+    "mouth": [
+     16,
+     5
+    ]
+   }
+  },
+  "saury": {
+   "x": 372,
+   "y": 52,
+   "w": 37,
+   "h": 8,
+   "anchor": {
+    "mouth": [
+     32,
+     4
+    ]
+   }
+  },
+  "halfbeak": {
+   "x": 410,
+   "y": 52,
+   "w": 39,
+   "h": 8,
+   "anchor": {
+    "mouth": [
+     32,
+     4
+    ]
+   }
+  },
+  "needlefish": {
+   "x": 450,
+   "y": 52,
+   "w": 43,
+   "h": 8,
+   "anchor": {
+    "mouth": [
+     35,
+     4
+    ]
+   }
+  }
+ },
+ "meta": {
+  "species": {
+   "anchovy": {
+    "name": "멸치",
+    "silhouette": "small"
+   },
+   "sardine": {
+    "name": "정어리",
+    "silhouette": "small"
+   },
+   "gizzard_shad": {
+    "name": "전어",
+    "silhouette": "small"
+   },
+   "herring": {
+    "name": "청어",
+    "silhouette": "small"
+   },
+   "goby": {
+    "name": "망둥어",
+    "silhouette": "small"
+   },
+   "red_seabream": {
+    "name": "참돔",
+    "silhouette": "deep"
+   },
+   "black_seabream": {
+    "name": "감성돔",
+    "silhouette": "deep"
+   },
+   "striped_beakfish": {
+    "name": "돌돔",
+    "silhouette": "deep"
+   },
+   "filefish": {
+    "name": "쥐치",
+    "silhouette": "deep"
+   },
+   "opaleye": {
+    "name": "벵에돔",
+    "silhouette": "deep"
+   },
+   "koi": {
+    "name": "비단잉어",
+    "silhouette": "deep"
+   },
+   "golden_seabream": {
+    "name": "황금 참돔",
+    "silhouette": "deep"
+   },
+   "saury": {
+    "name": "꽁치",
+    "silhouette": "long"
+   },
+   "halfbeak": {
+    "name": "학공치",
+    "silhouette": "long"
+   },
+   "needlefish": {
+    "name": "동갈치",
+    "silhouette": "long"
+   },
+   "mackerel": {
+    "name": "고등어",
+    "silhouette": "torpedo"
+   },
+   "horse_mackerel": {
+    "name": "전갱이",
+    "silhouette": "torpedo"
+   },
+   "mullet": {
+    "name": "숭어",
+    "silhouette": "torpedo"
+   },
+   "sea_bass": {
+    "name": "농어",
+    "silhouette": "torpedo"
+   },
+   "salmon": {
+    "name": "연어",
+    "silhouette": "torpedo"
+   },
+   "spanish_mackerel": {
+    "name": "삼치",
+    "silhouette": "torpedo"
+   },
+   "yellowtail": {
+    "name": "방어",
+    "silhouette": "torpedo"
+   },
+   "skipjack": {
+    "name": "가다랑어",
+    "silhouette": "torpedo"
+   },
+   "bluefin_tuna": {
+    "name": "참다랑어",
+    "silhouette": "torpedo"
+   },
+   "conger": {
+    "name": "붕장어",
+    "silhouette": "eel"
+   },
+   "moray": {
+    "name": "곰치",
+    "silhouette": "eel"
+   },
+   "pike_conger": {
+    "name": "갯장어",
+    "silhouette": "eel"
+   },
+   "cutlassfish": {
+    "name": "갈치",
+    "silhouette": "eel"
+   },
+   "ghost_cutlass": {
+    "name": "유령 갈치",
+    "silhouette": "eel"
+   },
+   "pufferfish": {
+    "name": "복어",
+    "silhouette": "round"
+   },
+   "grass_puffer": {
+    "name": "졸복",
+    "silhouette": "round"
+   },
+   "porcupinefish": {
+    "name": "가시복",
+    "silhouette": "round"
+   },
+   "sunfish": {
+    "name": "개복치",
+    "silhouette": "round"
+   },
+   "rockfish": {
+    "name": "우럭",
+    "silhouette": "bottom"
+   },
+   "scorpionfish": {
+    "name": "쏨뱅이",
+    "silhouette": "bottom"
+   },
+   "greenling": {
+    "name": "쥐노래미",
+    "silhouette": "bottom"
+   },
+   "dark_rockfish": {
+    "name": "볼락",
+    "silhouette": "bottom"
+   },
+   "catfish": {
+    "name": "메기",
+    "silhouette": "bottom"
+   },
+   "anglerfish": {
+    "name": "아귀",
+    "silhouette": "angler"
+   },
+   "lantern_angler": {
+    "name": "초롱아귀",
+    "silhouette": "angler"
+   }
+  }
+ }
+}

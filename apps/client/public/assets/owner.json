@@ -1,0 +1,17 @@
+{
+ "image": "owner.png",
+ "frames": {
+  "owner_truth": {
+   "x": 1,
+   "y": 1,
+   "w": 301,
+   "h": 143
+  },
+  "owner_shadow": {
+   "x": 1,
+   "y": 145,
+   "w": 301,
+   "h": 119
+  }
+ }
+}
