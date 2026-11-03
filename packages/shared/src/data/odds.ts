@@ -47,6 +47,9 @@ export const ZONE_ODDS: Readonly<Record<SeaColor, Odds>> = {
 /** Multipliers for a cast made on a dark deep-sea tile of the top-down map. */
 export const DEEP_TILE_BONUS: OddsMod = { grade: { rare: 1.5, legendary: 2 }, size: { A: 1.5, S: 2 } };
 
+/** Fishing inside a storm (design §3-3 폭풍): rarer fish come up. */
+export const STORM_BONUS: OddsMod = { grade: { rare: 1.4, legendary: 1.6 } };
+
 /** Per-point (or per-tile) multipliers on top of the zone table. */
 export type OddsMod = { grade?: Partial<Record<FishGrade, number>>; size?: Partial<Record<SizeGrade, number>> };
 

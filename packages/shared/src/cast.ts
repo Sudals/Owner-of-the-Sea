@@ -1,5 +1,5 @@
 import { FISH_BY_ID } from "./data/fish";
-import { applyMod, DEEP_TILE_BONUS, FISH_GRADES, SIZE_BANDS, SIZE_GRADES, ZONE_ODDS, type FishGrade, type Odds, type SizeGrade } from "./data/odds";
+import { applyMod, DEEP_TILE_BONUS, FISH_GRADES, STORM_BONUS, SIZE_BANDS, SIZE_GRADES, ZONE_ODDS, type FishGrade, type Odds, type SizeGrade } from "./data/odds";
 import { POLLUTANT_BY_SEA, type FishingPoint } from "./data/points";
 import { OMEN } from "./data/scoring";
 import { seeded, weighted } from "./rng";
@@ -15,16 +15,18 @@ export type CastOptions = {
   pollutant?: boolean;
   /** Cast made on a dark deep-sea tile of the top-down map (§4-8). Defaults to the point's flag. */
   deep?: boolean;
+  /** Cast made inside a storm (§3-3). */
+  storm?: boolean;
 };
 
-/** Effective odds at a point (zone table × point tweak × deep-tile bonus). */
-export function oddsAt(point: FishingPoint, deep = point.deep ?? false): Odds {
-  return applyMod(ZONE_ODDS[point.sea], point.odds, deep ? DEEP_TILE_BONUS : undefined);
+/** Effective odds at a point (zone table × point tweak × deep-tile bonus × storm bonus). */
+export function oddsAt(point: FishingPoint, deep = point.deep ?? false, storm = false): Odds {
+  return applyMod(ZONE_ODDS[point.sea], point.odds, deep ? DEEP_TILE_BONUS : undefined, storm ? STORM_BONUS : undefined);
 }
 
 export function rollCast(seedHex: string, castIndex: number, point: FishingPoint, opts: CastOptions = {}): CastRoll {
   const r = seeded(seedHex, "cast", castIndex);
-  const odds = oddsAt(point, opts.deep ?? point.deep ?? false);
+  const odds = oddsAt(point, opts.deep ?? point.deep ?? false, opts.storm ?? false);
 
   let fishId: string;
   if (opts.pollutant) fishId = POLLUTANT_BY_SEA[point.sea];

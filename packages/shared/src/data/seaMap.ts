@@ -139,6 +139,13 @@ export const ISLANDS: readonly Island[] = DEFS.map((d) => ({ ...d, parts: d.part
 export const ISLAND_BY_ID: Readonly<Record<string, Island>> = Object.fromEntries(ISLANDS.map((i) => [i.id, i]));
 export const START_ISLAND = ISLANDS[0]!;
 
+/** Unit vector from the island out through its dock — the way a boat leaving it points. */
+export function dockFacing(isl: Island): [number, number] {
+  const dx = isl.dock[0] - isl.cx, dy = isl.dock[1] - isl.cy;
+  const len = Math.hypot(dx, dy) || 1;
+  return [dx / len, dy / len];
+}
+
 export type MapPoint = {
   id: string;
   /** Species pool (points.ts). */

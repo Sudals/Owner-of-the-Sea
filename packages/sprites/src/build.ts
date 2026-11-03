@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { contactSheet, writeAtlas, writePng, type SheetItem } from "./lib/sheet";
 import { buildAngler, withRod } from "./sprites/angler";
 import { buildBoats } from "./sprites/boat";
+import { buildBoatTop } from "./sprites/boatTop";
 import { buildProps } from "./sprites/props";
 import { buildUi } from "./sprites/ui";
 import { Img } from "./lib/image";
@@ -38,6 +39,7 @@ const groups: Group[] = [
     preview: { scale: 4, cols: 9, rod: true },
   },
   { name: "boat", build: buildBoats, meta: () => ({ anchors: "stand = angler feet on deck" }), preview: { scale: 4, cols: 2 } },
+  { name: "boat_top", build: buildBoatTop, meta: () => ({ dirs: 16, note: "top_lv{L}_{d}: d=0 east, 4 south, 8 west, 12 north; sprite center = boat center" }), preview: { scale: 4, cols: 16 } },
   { name: "props", build: buildProps, preview: { scale: 6, cols: 7 } },
   { name: "ui", build: buildUi, meta: () => ({ anchors: "slice = 9-slice corner size [x, y]" }), preview: { scale: 6, cols: 8 } },
   { name: "pollutants", build: buildPollutants, meta: () => ({ bosses: BOSS_META }), preview: { scale: 3, cols: 2 } },
