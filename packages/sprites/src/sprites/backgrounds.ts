@@ -113,14 +113,7 @@ export function renderSea(sea: SeaId): Img {
 
   // ── underwater ──
   vgrad(img, WATERLINE, BG_H - 1, L.under);
-  // light rays slanting down from the surface
-  if (L.rays > 0)
-    for (let y = WATERLINE; y < BG_H; y++)
-      for (let x = 0; x < BG_W; x++) {
-        const band = (x + (y - WATERLINE) * 0.55) % 110;
-        const depthFade = 1 - (y - WATERLINE) / (BG_H - WATERLINE);
-        if (band < 22 && bayer(x, y) < 0.32 * L.rays * depthFade * Math.sin((band / 22) * Math.PI)) img.set(x, y, lighter(img.get(x, y)));
-      }
+  underwaterRays(img, L.rays);
 
   // drowned city on its own layer, fogged by depth
   const city = new Img(BG_W, BG_H);
@@ -171,14 +164,166 @@ export function renderSea(sea: SeaId): Img {
     img.set(x, y, sea === "ink" ? (r() > 0.5 ? C.gray1 : C.violet2) : lighter(lighter(img.get(x, y))));
   }
 
-  // static surface band (the game animates waves on top)
-  hline(img, 0, BG_W - 1, WATERLINE, C.foam2);
-  hline(img, 0, BG_W - 1, WATERLINE + 1, lighter(L.under[0]!));
-  for (let x = 0; x < BG_W; x += 2) if (bayer(x, WATERLINE + 2) < 0.5) img.set(x, WATERLINE + 2, lighter(L.under[0]!));
+  surfaceBand(img, L.under[0]!, 0);
   return img;
 }
 
 export const SEAS: SeaId[] = ["jade", "azure", "indigo", "ink"];
+
+/** Light rays slanting down from the surface, fading with depth. */
+function underwaterRays(img: Img, strength: number, x0 = 0): void {
+  if (strength <= 0) return;
+  for (let y = WATERLINE; y < BG_H; y++)
+    for (let x = x0; x < BG_W; x++) {
+      const band = (x + (y - WATERLINE) * 0.55) % 110;
+      const depthFade = 1 - (y - WATERLINE) / (BG_H - WATERLINE);
+      if (band < 22 && bayer(x, y) < 0.32 * strength * depthFade * Math.sin((band / 22) * Math.PI)) img.set(x, y, lighter(img.get(x, y)));
+    }
+}
+
+/** Static surface band from x0 rightward (the game animates waves on top). */
+function surfaceBand(img: Img, under0: number, x0: number): void {
+  hline(img, x0, BG_W - 1, WATERLINE, C.foam2);
+  hline(img, x0, BG_W - 1, WATERLINE + 1, lighter(under0));
+  for (let x = x0; x < BG_W; x += 2) if (bayer(x, WATERLINE + 2) < 0.5) img.set(x, WATERLINE + 2, lighter(under0));
+}
+
+// ── Starting-island dock (선착장). Islands are TBD (design §3-1), so this is a generic
+//    village: lighthouse, houses on a green hill, a beach, and a wooden pier into jade water.
+
+/** Where things sit in the dock background; exported to the game via bg_meta.json. */
+export const DOCK = {
+  stand: [344, 146] as [number, number], pierTop: 146, pierFrom: 168, pierTo: 362, shoreX: 236,
+  /** seabed: flat ground until bedFrom, slopes down to bedY at bedTo, flat after */
+  bedFrom: 200, bedTo: 340, bedY: 330,
+};
+
+const hillTop = (x: number) => 62 + (WATERLINE - 62) * Math.min(1, x / 250) ** 1.55;
+
+function house(img: Img, x: number, base: number, w: number, h: number, wall: number, roof: number): void {
+  rect(img, x, base - h, w, h, wall);
+  vline(img, x, base - h, base - 1, darkerOf(wall));
+  polygon(img, [[x - 2, base - h + 1], [x + w / 2, base - h - w * 0.45], [x + w + 2, base - h + 1]], roof);
+  hline(img, x - 2, x + w + 1, base - h, darkerOf(roof));
+  rect(img, x + w - 6, base - 6, 3, 6, C.bark2); // door
+  rect(img, x + 3, base - h + 3, 3, 3, C.foam1); // window
+  img.set(x + 3, base - h + 3, C.white);
+}
+const darkerOf = (c: number) => (c === C.white ? C.gray2 : c === C.sand2 ? C.sand1 : c === C.red2 ? C.red1 : c === C.coral ? C.red2 : c === C.sea1 ? C.deep2 : c === C.wood ? C.bark2 : C.bark1);
+
+export function renderDock(): Img {
+  const L = LOOK.jade;
+  const img = new Img(BG_W, BG_H);
+  const r = rng(4242);
+
+  // sky + far sea (shared with the jade sea)
+  vgrad(img, 0, HORIZON, L.sky);
+  for (let i = 0; i < 4; i++) cloud(img, 280 + r() * 360, 20 + r() * 60, 8 + r() * 8, C.white, C.foam2, C.foam1, r);
+  vgrad(img, HORIZON, WATERLINE - 1, L.far);
+  for (const [x, w, h] of [[440, 80, 12], [580, 40, 6]] as const)
+    ellipse(img, x + w / 2, HORIZON + 1, w / 2, h, (px, py, nx, ny) => (py > HORIZON ? 0 : ny < -0.6 ? C.green3 : nx < 0 ? C.green2 : C.green1));
+  hline(img, 0, BG_W - 1, HORIZON, lighter(L.far[0]!));
+  for (let i = 0; i < 60; i++) {
+    const y = HORIZON + 3 + Math.floor(r() ** 2 * (WATERLINE - HORIZON - 6)), x = 240 + Math.floor(r() * 400);
+    hline(img, x, x + 1 + Math.floor(r() * 3), y, lighter(img.get(x, y)));
+  }
+
+  // underwater
+  vgrad(img, WATERLINE, BG_H - 1, L.under);
+  underwaterRays(img, L.rays);
+
+  // island hill: grass on top, beach where it meets the water
+  for (let x = 0; x < 250; x++) {
+    const top = Math.round(hillTop(x));
+    for (let y = top; y < WATERLINE; y++) {
+      const d = y - top;
+      let c: number;
+      if (x > 150 && y > WATERLINE - 12 - (x - 150) * 0.05) c = dither(x, y, (y - (WATERLINE - 14)) / 14, C.sand2, C.sand1);
+      else if (d < 2) c = C.green3;
+      else if (d < 10) c = dither(x, y, d / 20, C.green3, C.green2);
+      else c = dither(x, y, Math.min(0.55, (d - 10) / 60), C.green2, C.green1);
+      img.set(x, y, c);
+    }
+  }
+  // lighthouse
+  const lx = 26, lb = Math.round(hillTop(lx)) + 2;
+  for (let y = lb - 44; y < lb; y++) {
+    const half = 4 + Math.floor((y - (lb - 44)) / 14);
+    hline(img, lx - half, lx + half, y, Math.floor((y - (lb - 44)) / 7) % 2 === 0 ? C.white : C.red2);
+    img.set(lx - half, y, C.gray2);
+  }
+  rect(img, lx - 4, lb - 52, 9, 8, C.navy);
+  rect(img, lx - 3, lb - 51, 7, 6, C.yellow);
+  polygon(img, [[lx - 6, lb - 52], [lx, lb - 58], [lx + 6, lb - 52]], C.red1);
+  // houses + trees along the slope
+  for (const [x, w, h, wall, roof] of [[52, 16, 11, C.white, C.red2], [84, 18, 12, C.sand2, C.sea1], [118, 14, 10, C.white, C.coral], [146, 18, 11, C.sand2, C.wood]] as const)
+    house(img, x, Math.round(hillTop(x + w / 2)) + 4, w, h, wall, roof);
+  for (const tx of [42, 74, 108, 138, 172]) {
+    const ty = Math.round(hillTop(tx)) - 2;
+    disc(img, tx, ty - 3, 4, C.green1);
+    disc(img, tx - 1, ty - 4, 3, C.green2);
+    img.set(tx - 2, ty - 6, C.green3);
+    vline(img, tx, ty, ty + 3, C.bark2);
+  }
+
+  // seabed: the beach slopes down under the water, then a flat sandy floor
+  const bed = (x: number) => (x < DOCK.bedFrom ? WATERLINE : Math.min(DOCK.bedY, WATERLINE + ((x - DOCK.bedFrom) / (DOCK.bedTo - DOCK.bedFrom)) * (DOCK.bedY - WATERLINE)));
+  const under = new Img(BG_W, BG_H);
+  for (let x = 0; x < BG_W; x++)
+    for (let y = Math.round(bed(x)); y < BG_H; y++) {
+      // ground cross-section: a sandy skin over darker soil
+      const d = y - bed(x);
+      under.set(x, y, d < 6 ? dither(x, y, d / 6, C.sand2, C.sand1) : d < 26 ? dither(x, y, (d - 6) / 20, C.sand1, C.wood) : dither(x, y, Math.min(1, (d - 26) / 40), C.wood, C.bark2));
+    }
+  for (const [x, y, w, h] of [[262, 268, 10, 6], [300, 300, 14, 8], [470, 326, 18, 8], [560, 328, 12, 6]] as const)
+    ellipse(under, x, y, w / 2, h / 2, (px, py, nx, ny) => (ny < -0.3 ? C.gray2 : C.gray1));
+  for (const sx of [250, 284, 320, 420, 512, 600]) {
+    const base = Math.round(bed(sx));
+    for (let k = 0; k < 14; k++) under.set(sx + Math.round(Math.sin(k * 0.7 + sx) * 1.5), base - k, k % 4 === 0 ? C.green3 : C.green2);
+  }
+  ellipse(under, 520, 322, 7, 6, (px, py, nx, ny) => (Math.hypot(nx, ny) < 0.45 ? 0 : C.navy)); // sunken tire
+
+  // pier pilings reach the seabed (fogged with the rest of the underwater layer)
+  for (let px = DOCK.pierFrom + 8; px <= DOCK.pierTo; px += 38) {
+    rect(under, px, WATERLINE, 3, Math.round(bed(px)) - WATERLINE, C.bark2);
+    vline(under, px + 2, WATERLINE, Math.round(bed(px)), C.bark1);
+    for (let y = WATERLINE; y < WATERLINE + 8; y++) if (r() > 0.4) under.set(px + (r() > 0.5 ? 0 : 2), y, C.green2);
+  }
+  fogInto(img, under, (y) => Math.min(0.85, 0.12 + ((y - WATERLINE) / (BG_H - WATERLINE)) * 0.3));
+
+  // marine snow
+  for (let i = 0; i < 50; i++) {
+    const x = 200 + Math.floor(r() * 440), y = WATERLINE + 4 + Math.floor(r() * (BG_H - WATERLINE - 4));
+    img.set(x, y, lighter(lighter(img.get(x, y))));
+  }
+  surfaceBand(img, L.under[0]!, Math.round(DOCK.shoreX - 30));
+
+  // pier above water: pilings, deck, railing posts and rope
+  for (let px = DOCK.pierFrom + 8; px <= DOCK.pierTo; px += 38) {
+    rect(img, px, DOCK.pierTop + 3, 3, WATERLINE - DOCK.pierTop - 3, C.bark2);
+    vline(img, px + 2, DOCK.pierTop + 3, WATERLINE - 1, C.bark1);
+  }
+  rect(img, DOCK.pierFrom, DOCK.pierTop, DOCK.pierTo - DOCK.pierFrom, 4, C.wood);
+  hline(img, DOCK.pierFrom, DOCK.pierTo - 1, DOCK.pierTop, C.sand1);
+  hline(img, DOCK.pierFrom, DOCK.pierTo - 1, DOCK.pierTop + 3, C.bark1);
+  for (let x = DOCK.pierFrom; x < DOCK.pierTo; x += 6) vline(img, x, DOCK.pierTop + 1, DOCK.pierTop + 2, C.bark2);
+  const posts: number[] = [];
+  for (let x = DOCK.pierFrom + 2; x < DOCK.pierTo - 30; x += 28) posts.push(x);
+  for (const x of posts) {
+    rect(img, x, DOCK.pierTop - 11, 2, 11, C.bark2);
+    img.set(x, DOCK.pierTop - 11, C.wood);
+  }
+  for (let i = 0; i + 1 < posts.length; i++) {
+    const a = posts[i]!, b = posts[i + 1]!;
+    for (let x = a + 2; x < b; x++) img.set(x, DOCK.pierTop - 9 + Math.round(Math.sin(((x - a) / (b - a)) * Math.PI) * 2), C.sand1);
+  }
+  // bollard with a rope coil at the end of the pier
+  rect(img, DOCK.pierTo - 8, DOCK.pierTop - 5, 4, 5, C.gray1);
+  hline(img, DOCK.pierTo - 9, DOCK.pierTo - 3, DOCK.pierTop - 5, C.gray2);
+  ellipse(img, DOCK.pierTo - 18, DOCK.pierTop - 1, 3, 1.5, C.sand1);
+
+  return img;
+}
 
 /** Preview: one background in every LUT (time of day + pollution). */
 export function lutVariants(base: Img): { name: LutName; img: Img }[] {

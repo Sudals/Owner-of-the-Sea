@@ -111,7 +111,8 @@ export const LUTS = {
     ["deep2", "violet1"], ["jade3", "sand1"], ["jade2", "wood"], ["white", "sand2"], ["gray2", "skin1"],
   ]),
   night: lut([
-    ["white", "gray2"], ["foam2", "sea3"], ["foam1", "sea2"], ["sea3", "sea1"], ["sea2", "deep2"],
+    // foam/white step down further so clouds read as dim shapes under the moon, not glowing
+    ["white", "gray2"], ["foam2", "sea1"], ["foam1", "deep2"], ["sea3", "sea1"], ["sea2", "deep2"],
     ["sea1", "deep1"], ["deep2", "navy"], ["deep1", "navy"], ["jade3", "jade1"], ["jade2", "deep1"],
     ["sand2", "gray2"], ["sand1", "gray1"], ["wood", "bark2"], ["green3", "green1"], ["green2", "green1"],
     ["skin2", "skin1"], ["peach", "violet2"], ["coral", "red2"], ["yellow", "sand1"],

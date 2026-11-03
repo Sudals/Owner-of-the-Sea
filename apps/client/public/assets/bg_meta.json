@@ -1,0 +1,27 @@
+{
+ "size": [
+  640,
+  360
+ ],
+ "horizon": 132,
+ "waterline": 176,
+ "dock": {
+  "stand": [
+   344,
+   146
+  ],
+  "pierTop": 146,
+  "pierFrom": 168,
+  "pierTo": 362,
+  "shoreX": 236,
+  "bedFrom": 200,
+  "bedTo": 340,
+  "bedY": 330
+ },
+ "seas": [
+  "jade",
+  "azure",
+  "indigo",
+  "ink"
+ ]
+}

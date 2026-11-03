@@ -7,7 +7,8 @@ import { buildBoats } from "./sprites/boat";
 import { buildProps } from "./sprites/props";
 import { buildUi } from "./sprites/ui";
 import { Img } from "./lib/image";
-import { lutVariants, renderSea, SEAS } from "./sprites/backgrounds";
+import { BG_H, BG_W, DOCK, HORIZON, lutVariants, renderDock, renderSea, SEAS, WATERLINE } from "./sprites/backgrounds";
+import { writeFileSync } from "node:fs";
 import { buildFish, FISH } from "./sprites/fish";
 import { appIcon, BOSS_META, buildOwner, buildPollutants, buildSky } from "./sprites/pollutants";
 
@@ -57,6 +58,10 @@ for (const g of groups) {
 if (!only || only === "bg") {
   const seas = SEAS.map((sea) => ({ sea, img: renderSea(sea) }));
   for (const { sea, img } of seas) writePng(`${OUT}/bg_sea_${sea}.png`, img);
+  const dock = renderDock();
+  writePng(`${OUT}/bg_dock.png`, dock);
+  writeFileSync(`${OUT}/bg_meta.json`, JSON.stringify({ size: [BG_W, BG_H], horizon: HORIZON, waterline: WATERLINE, dock: DOCK, seas: SEAS }, null, 1));
+  writePng(`${PREVIEW}/bg_dock.png`, dock, 2);
   const grid2 = (imgs: Img[], cols: number) => {
     const w = imgs[0]!.w, h = imgs[0]!.h, rows = Math.ceil(imgs.length / cols);
     const out = new Img(w * cols, h * rows);
