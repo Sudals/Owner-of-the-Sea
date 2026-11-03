@@ -30,3 +30,6 @@ packages/sprites/preview/
 
 # build output
 dist/
+
+# desktop installers
+apps/desktop/release/

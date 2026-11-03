@@ -108,7 +108,7 @@ export class SeaScene implements Scene {
     }
     if (s.k === "towed") {
       s.t += dt;
-      if (s.t > 2.6) this.game.toIsland(s.island.id, { towed: true, lost: s.lost });
+      if (s.t > 2.6) this.game.toIsland(s.island.id, { towed: true, lost: s.lost, arrived: true });
       return;
     }
 
@@ -249,7 +249,7 @@ export class SeaScene implements Scene {
       const p = this.pending;
       this.pending = null;
       b.vx = b.vy = b.speed = 0;
-      if (p.kind === "dock") return this.game.toIsland(p.island.id);
+      if (p.kind === "dock") return this.game.toIsland(p.island.id, { arrived: true });
       const pool = POINT_BY_ID[p.point.pointId]!;
       return this.game.toFishing({
         kind: "boat",
@@ -381,7 +381,8 @@ export class SeaScene implements Scene {
     return [
       { id: "resume", label: "계속하기", rect: { x, y: 150, w, h: 20 } },
       { id: "chart", label: "해도 보기", rect: { x, y: 176, w, h: 20 } },
-      { id: "title", label: "로비로 나가기", rect: { x, y: 202, w, h: 20 } },
+      { id: "save", label: "저장", rect: { x, y: 202, w, h: 20 } },
+      { id: "title", label: "로비로 나가기", rect: { x, y: 228, w, h: 20 } },
     ];
   }
 
@@ -398,9 +399,14 @@ export class SeaScene implements Scene {
     else if (id === "chart") {
       this.pause = null;
       this.openChart();
-    } else if (id === "title") {
+    } else if (id === "save") {
+      this.pause = null;
       this.persist();
-      this.game.toTitle();
+      void this.game.manualSave();
+    } else if (id === "title") {
+      this.pause = null;
+      this.persist();
+      this.game.leave("lobby");
     }
   }
 
@@ -473,11 +479,12 @@ export class SeaScene implements Scene {
     }
     if (this.pause) {
       dim(ctx, 0.5);
-      panel(ctx, assets, "panel_wood", 320 - 90, 114, 180, 122);
+      panel(ctx, assets, "panel_wood", 320 - 90, 114, 180, 148);
       text(ctx, "일시정지", 320, 126, { align: "center", color: lutHex("bark1"), shadow: null, font: "bold 12px Galmuri11, monospace" });
       this.pauseItems().forEach((it, i) => button(ctx, assets, i === this.pause!.sel ? "hover" : "normal", it.label, it.rect.x, it.rect.y, it.rect.w, it.rect.h));
     }
     if (this.chartOpen && this.chart) drawChart(ctx, assets, this.chart, this.explored, { boat: this.boat, clockH: this.game.clockH, t: this.t });
+    this.game.drawFlash(ctx, assets);
   }
 
   /** Little glints drifting on open water tiles (the baked map is still; this makes it move). */
@@ -673,6 +680,7 @@ export class SeaScene implements Scene {
     gaugeH(ctx, assets, 30, 48, 112, w.hullHp / hmax, w.hullHp / hmax < 0.3 ? lutHex("coral") : lutHex("jade3"));
     text(ctx, `${w.hullHp}`, 174, 46, { align: "right", color: lutHex("bark1"), shadow: null });
 
+    this.game.drawSaveLabel(ctx, assets, 8, 72);
     button(ctx, assets, "normal", "해도 M", HUD_CHART.x, HUD_CHART.y, HUD_CHART.w, HUD_CHART.h);
     button(ctx, assets, "normal", "메뉴", HUD_MENU.x, HUD_MENU.y, HUD_MENU.w, HUD_MENU.h);
 

@@ -38,7 +38,7 @@ expect("POST start (same name, other case)", await call("POST", "/api/auth/start
 expect("POST start (bad name)", await call("POST", "/api/auth/start", { body: { name: "가" } }), 400, (j) => j.error?.fields);
 expect("POST start (old signup body)", await call("POST", "/api/auth/signup", { body: { username: "x", password: "y" } }), 404, (j) => j.error?.code);
 
-expect("GET /api/me (device token)", await call("GET", "/api/me", { token: tok1 }), 200, (j) => ({ name: j.account?.name, gold: j.player?.gold, location: j.player?.locationId, unlocks: j.unlocks?.map((u) => u.islandId) }));
+expect("GET /api/me (device token)", await call("GET", "/api/me", { token: tok1 }), 200, (j) => ({ name: j.account?.name, gold: j.gold, at: j.world?.at, hull: j.world?.hullLv, unlocks: j.unlocks?.map((u) => u.islandId) }));
 expect("GET /api/me (no token)", await call("GET", "/api/me"), 401, (j) => j.error?.code);
 
 // another PC: lowercase, spaces instead of dashes, look-alike letters

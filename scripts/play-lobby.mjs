@@ -4,7 +4,7 @@
 import { mkdirSync } from "node:fs";
 import { chromium } from "playwright";
 
-const BASE = process.argv[2] ?? "http://localhost:5173";
+const BASE = process.argv[2] ?? "http://localhost:5173/?local"; // LocalBackend (no server)
 const OUT = process.argv[3] ?? "screenshots";
 mkdirSync(OUT, { recursive: true });
 
@@ -137,14 +137,14 @@ await page.keyboard.press("Space"); // pull in early
 v = await waitFor((x) => x.k === "idle", 5000);
 const nextIndex = v.nextIndex;
 
-// ESC → pause → 로비로 (third item)
+// ESC → pause → 로비로 (fourth item: 계속하기 / 섬으로 / 저장 / 로비로)
 await page.keyboard.press("Escape");
 v = await waitFor((x) => x.pause !== null);
 await shot("lobby-pause");
-await page.keyboard.press("ArrowDown");
-await page.waitForTimeout(40);
-await page.keyboard.press("ArrowDown");
-await page.waitForTimeout(40);
+for (let i = 0; i < 3; i++) {
+  await page.keyboard.press("ArrowDown");
+  await page.waitForTimeout(40);
+}
 await page.keyboard.press("Enter");
 v = await waitFor((x) => x.scene === "title" && x.k === "menu");
 check("ESC → 로비로 returns to the lobby with the save shown", v.profile?.name === "바다사람" && v.sel === 0, `sel=${v.sel}`);
@@ -166,10 +166,10 @@ check("이어하기 resumes the same seed and cast index", v.seed === seed && v.
 // 새 게임 over a save asks first; cancel keeps it
 await page.keyboard.press("Escape");
 await waitFor((x) => x.pause !== null);
-await page.keyboard.press("ArrowDown");
-await page.waitForTimeout(40);
-await page.keyboard.press("ArrowDown");
-await page.waitForTimeout(40);
+for (let i = 0; i < 3; i++) {
+  await page.keyboard.press("ArrowDown");
+  await page.waitForTimeout(40);
+}
 await page.keyboard.press("Enter");
 await waitFor((x) => x.scene === "title" && x.k === "menu");
 await page.keyboard.press("ArrowDown");

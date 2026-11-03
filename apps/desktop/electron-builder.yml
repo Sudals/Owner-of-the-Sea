@@ -1,0 +1,28 @@
+# Windows installer + portable exe (design §9 apps/desktop, §10-2). Build on Windows:
+#   pnpm --filter @sea/desktop dist:win
+appId: com.sudals.ownerofthesea
+productName: 바다의 주인
+executableName: OwnerOfTheSea
+copyright: Copyright © 2026 Sudals
+directories:
+  output: release
+  buildResources: build
+files:
+  - dist/**
+  - package.json
+extraResources:
+  - from: ../client/dist/full
+    to: client
+asar: true
+win:
+  icon: build/icon.png
+  target:
+    - nsis
+    - portable
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  artifactName: OwnerOfTheSea-Setup-${version}.${ext}
+  shortcutName: 바다의 주인
+portable:
+  artifactName: OwnerOfTheSea-${version}-portable.${ext}

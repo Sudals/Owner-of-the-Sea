@@ -17,7 +17,9 @@
     "screenshot": "node scripts/screenshot.mjs",
     "db:generate": "pnpm --filter @sea/api db:generate",
     "db:migrate": "pnpm --filter @sea/api db:migrate",
-    "deploy:api": "pnpm --filter @sea/api deploy"
+    "deploy:api": "pnpm --filter @sea/api deploy",
+    "desktop": "pnpm --filter @sea/client build && pnpm --filter @sea/desktop start",
+    "dist:win": "pnpm --filter @sea/desktop dist:win"
   },
   "devDependencies": {
     "playwright": "1.64.1"

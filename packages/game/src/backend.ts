@@ -11,7 +11,25 @@ export type FishingSession = {
   nextIndex: number;
   /** Cast index from which an omen guarantees a pollutant (design §4-5), or null. */
   omenFrom: number | null;
+  /** Deep tile / storm as fixed when the session opened (the server decides them in the full build). */
+  conds?: { deep: boolean; storm: boolean };
 };
+
+/** What a fishing scene asks to open: the spot, and where/when the boat is (sea points). */
+export type SessionSpot = {
+  /** Map point id (p_jade_3) or island dock (red_lighthouse_dock) — one session per spot. */
+  spotId: string;
+  /** Species pool + odds (points.ts). */
+  pointId: string;
+  at?: { x: number; y: number };
+  clockH?: number;
+  deep?: boolean;
+  storm?: boolean;
+};
+
+export type SaveReason = "manual" | "dock" | "exit" | "recover" | "lobby";
+export type SaveOutcome = { ok: boolean; message: string; caught?: number; rejected?: number };
+export type SaveStatus = { lastSavedAt: number | null; unsavedCaught: number; dirty: boolean };
 
 export type CastResult = "caught" | "escaped";
 
@@ -24,9 +42,13 @@ export type CastRecord = {
   reelMs: number;
   /** Client timestamp (ms). */
   t: number;
+  /** WorldState.seaTime at the cast (freshness clock). */
+  seaT?: number;
 };
 
 export type HoldItem = {
+  /** `${sessionId}:${castIndex}` */
+  id?: string;
   fishId: string;
   sizeCm: number;
   spotId: string;
@@ -65,8 +87,8 @@ export type Profile = {
 };
 
 export interface GameBackend {
-  /** Open (or resume) the seed session for a fishing point. */
-  openSession(spotId: string): Promise<FishingSession>;
+  /** Open (or resume) the seed session for a fishing spot. */
+  openSession(spot: SessionSpot): Promise<FishingSession>;
   /** Journal one finished cast locally; it reaches the server on the next save. */
   recordCast(sessionId: string, cast: CastRecord): void;
   /** Leaving the point closes its session (a fresh seed next time). */
@@ -93,4 +115,13 @@ export interface GameBackend {
   recover?(code: string): Promise<Profile>;
   /** 설정 → 이 기기에서 기록 지우기. */
   forget(): Promise<void>;
+
+  // ── saving (design §11): only where saves go to a server ──
+  /** Send everything since the last save in one call; the reply's confirmed state replaces ours. */
+  commit?(reason: SaveReason): Promise<SaveOutcome>;
+  saveStatus?(): SaveStatus;
+  /** Unsaved progress left by a crash or a closed tab (design §11-5). */
+  pendingRecovery?(): boolean;
+  /** Drop unsaved progress and go back to the last saved state ("저장 안 하고 종료"). */
+  discardUnsaved?(): void;
 }

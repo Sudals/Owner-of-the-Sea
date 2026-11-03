@@ -1,4 +1,4 @@
-import type { CastRecord, FishingSession, GameBackend, Gear, HoldItem, Profile, WorldState } from "@sea/game";
+import type { CastRecord, FishingSession, GameBackend, Gear, HoldItem, Profile, SessionSpot, WorldState } from "@sea/game";
 import { FUEL, HULLS, newSeedHex, START_ISLAND } from "@sea/shared";
 
 // Demo-build backend (design §2, §7, §11-5): everything in localStorage, seeds made locally.
@@ -46,11 +46,13 @@ export class LocalBackend implements GameBackend {
     this.store = this.load();
   }
 
-  async openSession(spotId: string): Promise<FishingSession> {
+  async openSession(spot: SessionSpot): Promise<FishingSession> {
     const now = Date.now();
+    const spotId = spot.spotId;
     const open = this.store.sessions[spotId];
     if (open && !open.closed && now - open.createdAt < SESSION_TTL_MS) return toSession(open);
-    const s: StoredSession = { sessionId: crypto.randomUUID(), seed: newSeedHex(), spotId, nextIndex: 0, omenFrom: null, createdAt: now, closed: false };
+    const conds = { deep: !!spot.deep, storm: !!spot.storm };
+    const s: StoredSession = { sessionId: crypto.randomUUID(), seed: newSeedHex(), spotId, nextIndex: 0, omenFrom: null, conds, createdAt: now, closed: false };
     this.store.sessions[spotId] = s;
     this.save();
     return toSession(s);
@@ -62,7 +64,7 @@ export class LocalBackend implements GameBackend {
     s.nextIndex = Math.max(s.nextIndex, cast.i + 1);
     this.store.journal.push({ sessionId, cast });
     if (cast.result === "caught")
-      this.store.hold.push({ fishId: cast.fishId, sizeCm: cast.sizeCm, spotId: s.spotId, caughtAt: new Date(cast.t).toISOString(), freshAt: this.store.world.seaTime });
+      this.store.hold.push({ id: `${sessionId}:${cast.i}`, fishId: cast.fishId, sizeCm: cast.sizeCm, spotId: s.spotId, caughtAt: new Date(cast.t).toISOString(), freshAt: cast.seaT ?? this.store.world.seaTime });
     this.save();
   }
 
@@ -149,7 +151,7 @@ export class LocalBackend implements GameBackend {
 }
 
 function toSession(s: StoredSession): FishingSession {
-  return { sessionId: s.sessionId, seed: s.seed, spotId: s.spotId, nextIndex: s.nextIndex, omenFrom: s.omenFrom };
+  return { sessionId: s.sessionId, seed: s.seed, spotId: s.spotId, nextIndex: s.nextIndex, omenFrom: s.omenFrom, conds: s.conds };
 }
 
 function safeStorage(): Storage | null {

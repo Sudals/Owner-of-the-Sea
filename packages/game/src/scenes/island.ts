@@ -9,7 +9,7 @@ import { drawSurface } from "../render/water";
 // quests, NPCs, its own side-view background). For now every island shows the dock scene and
 // offers what M6 needs: fish from the dock, or cast off onto the sea map.
 
-export type ArrivalNote = { towed?: boolean; lost?: number };
+export type ArrivalNote = { towed?: boolean; lost?: number; /** came in from the sea: an autosave event */ arrived?: boolean };
 
 /** One-line concepts from design §3-1. */
 const BLURB: Record<string, string> = {
@@ -28,7 +28,7 @@ const BLURB: Record<string, string> = {
   black_lighthouse: "기름 연기에 그을린 마지막 등대",
 };
 
-const PANEL = { x: 380, y: 92, w: 236, h: 190 };
+const PANEL = { x: 380, y: 80, w: 236, h: 216 };
 
 export class IslandScene implements Scene {
   sel = 0;
@@ -57,6 +57,10 @@ export class IslandScene implements Scene {
     this.game.save();
     if (this.note?.towed) this.say(`배가 부서져 끌려왔다${this.note.lost ? ` · 물고기 ${this.note.lost}마리를 잃었다` : ""}`, 4.5);
     else if (refuel || repair) this.say("연료를 채우고 배를 손봤다 (상점이 열리기 전까지 무료)", 3.5);
+    // arriving at an island is an autosave (design §11-2)
+    if (this.note?.arrived && this.game.remote) {
+      void this.game.commit("dock").then((r) => this.game.flash(r.message, 3, r.ok ? undefined : lutHex("coral")));
+    }
   }
 
   private items() {
@@ -64,7 +68,8 @@ export class IslandScene implements Scene {
     return [
       { id: "fish", label: "선착장에서 낚시", rect: { x, y: PANEL.y + 90, w, h: 20 } },
       { id: "sail", label: "출항", rect: { x, y: PANEL.y + 116, w, h: 20 } },
-      { id: "title", label: "로비로 나가기", rect: { x, y: PANEL.y + 142, w, h: 20 } },
+      { id: "save", label: "저장", rect: { x, y: PANEL.y + 142, w, h: 20 } },
+      { id: "title", label: "로비로 나가기", rect: { x, y: PANEL.y + 168, w, h: 20 } },
     ];
   }
 
@@ -88,8 +93,10 @@ export class IslandScene implements Scene {
         return this.game.toFishing({ kind: "dock", islandId: this.islandId });
       case "sail":
         return this.game.toSea(this.islandId);
+      case "save":
+        return void this.game.manualSave();
       case "title":
-        return this.game.toTitle();
+        return this.game.leave("lobby");
     }
   }
 
@@ -119,11 +126,13 @@ export class IslandScene implements Scene {
     this.items().forEach((it, i) => button(ctx, assets, i === this.sel ? "hover" : "normal", it.label, it.rect.x, it.rect.y, it.rect.w, it.rect.h));
     text(ctx, "마을(상점·의뢰)은 준비 중이에요", P.x + P.w / 2, P.y + P.h + 6, { align: "center", color: lutHex("foam2") });
     text(ctx, `${w.day}일차 ${this.game.clock.label()}`, 634, 344, { align: "right", color: lutHex("foam2") });
+    this.game.drawSaveLabel(ctx, assets, 6, 344);
 
     if (this.toast) {
       const tw = Math.max(160, textWidth(ctx, this.toast.text) + 28);
       panel(ctx, assets, "panel_sea", 320 - tw / 2, 40, tw, 26);
       text(ctx, this.toast.text, 320, 47, { align: "center" });
     }
+    this.game.drawFlash(ctx, assets);
   }
 }

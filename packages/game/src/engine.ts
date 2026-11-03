@@ -1,5 +1,6 @@
 import type { Assets } from "./assets";
 import { Input } from "./input";
+import type { Modal } from "./ui/modal";
 
 // Core loop (design §1, §7-1): fixed 640×360 internal resolution, integer upscaling,
 // fixed-step simulation at 60 Hz with rendering once per animation frame.
@@ -30,6 +31,8 @@ export class Engine {
   readonly assets: Assets;
   readonly dev: boolean;
 
+  /** A dialog over the scene; while set, the scene doesn't step (ui/modal.ts). */
+  modal: Modal | null = null;
   /** Seconds of simulated time since start. */
   time = 0;
   scale = 1;
@@ -109,7 +112,8 @@ export class Engine {
     let steps = 0;
     while (this.acc >= STEP && steps < MAX_STEPS) {
       this.input.update();
-      this.scene?.update(STEP, this);
+      if (this.modal) this.modal.update(this);
+      else this.scene?.update(STEP, this);
       this.time += STEP;
       this.acc -= STEP;
       steps++;
@@ -126,6 +130,7 @@ export class Engine {
 
     this.ctx.imageSmoothingEnabled = false;
     this.scene?.render(this.ctx, this);
+    this.modal?.render(this.ctx, this);
     this.present();
   }
 

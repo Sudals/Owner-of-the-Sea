@@ -71,6 +71,8 @@ export class TitleScene implements Scene {
       phase: i * 1.3,
     }));
     this.sel = this.firstEnabled();
+    // a crash or a closed tab left unsaved progress (design §11-5)
+    this.game.offerRecovery();
   }
 
   exit(): void {

@@ -1,14 +1,23 @@
 import { dockFacing, ISLAND_BY_ID, START_ISLAND, TILE } from "@sea/shared";
-import type { GameBackend, WorldState } from "./backend";
+import type { Assets } from "./assets";
+import { lutHex } from "./assets";
+import type { GameBackend, SaveOutcome, SaveReason, WorldState } from "./backend";
 import type { Engine } from "./engine";
+import { panel, text, textWidth } from "./render/ui";
 import { FishingScene, type Spot } from "./scenes/fishing";
 import { IslandScene, type ArrivalNote } from "./scenes/island";
 import { SeaScene } from "./scenes/sea";
 import { TitleScene } from "./scenes/title";
 import { Settings } from "./settings";
 import { Clock } from "./systems/timeOfDay";
+import { Modal } from "./ui/modal";
 
 export type BuildMode = "demo" | "full";
+
+/** Manual saves are rate-limited (design §11-2: 저장 후 30초 쿨다운). */
+export const MANUAL_SAVE_COOLDOWN_MS = 30_000;
+/** HUD nags (blinks) after this long without a save (design §11-2). */
+const NAG_AFTER_MS = 30 * 60_000;
 
 /** What every scene shares: where saves go, the build, local settings, the world and its clock,
  *  and the scene changes between 로비 → 섬 ⇄ 바다 → 낚시 (design §7-3). */
@@ -17,6 +26,11 @@ export class Game {
   /** One clock for every scene, so time keeps running across the island, the sea and fishing. */
   readonly clock = new Clock(9);
   private worldState: WorldState | null = null;
+  private lastManual = -Infinity;
+  private saving = false;
+  /** Set between "저장 안 하고 나가기" and the next play(): nothing may write the world back. */
+  private frozen = false;
+  private flashMsg: { text: string; until: number; color?: string } | null = null;
 
   constructor(
     readonly engine: Engine,
@@ -43,9 +57,149 @@ export class Game {
     if (atSea) this.world.seaTime += dt;
   }
 
+  /** Keep the world in the backend (local journal; a server sees it on the next commit). */
   save(): void {
-    this.world.hour = this.clock.hours;
-    this.backend.saveWorld(this.world);
+    // only a world in play has a live clock; from the lobby (crash recovery) the journal is as-is
+    if (this.frozen || !this.worldState) return;
+    this.worldState.hour = this.clock.hours;
+    this.backend.saveWorld(this.worldState);
+  }
+
+  // ── saving to the server (design §11) ──
+
+  /** True when saves go to a server (full build); the demo keeps everything locally as it goes. */
+  get remote(): boolean {
+    return !!this.backend.commit;
+  }
+
+  hasUnsaved(): boolean {
+    const s = this.backend.saveStatus?.();
+    return !!s && (s.dirty || s.unsavedCaught > 0);
+  }
+
+  /** One server save: everything since the last one, in one call. */
+  async commit(reason: SaveReason): Promise<SaveOutcome> {
+    this.save();
+    if (!this.backend.commit) return { ok: true, message: "저장했다" };
+    if (this.saving) return { ok: false, message: "저장 중이에요" };
+    this.saving = true;
+    try {
+      const r = await this.backend.commit(reason);
+      // the confirmed state may have replaced the world object
+      this.worldState = this.backend.world();
+      return r;
+    } finally {
+      this.saving = false;
+    }
+  }
+
+  /** 메뉴 → 저장, with the cooldown. Shows the result as a flash. */
+  async manualSave(): Promise<void> {
+    const wait = this.lastManual + MANUAL_SAVE_COOLDOWN_MS - Date.now();
+    if (wait > 0) return this.flash(`${Math.ceil(wait / 1000)}초 뒤에 다시 저장할 수 있어요`, 2);
+    this.flash("저장 중…", 10);
+    const r = await this.commit("manual");
+    if (r.ok) this.lastManual = Date.now();
+    this.flash(r.message, 3, r.ok ? undefined : lutHex("coral"));
+  }
+
+  /** "마지막 저장 12분 전 · 미저장 3마리" (full build only), and whether to nag. */
+  saveLabel(): { text: string; nag: boolean } | null {
+    const s = this.backend.saveStatus?.();
+    if (!s) return null;
+    const ago = s.lastSavedAt === null ? null : Date.now() - s.lastSavedAt;
+    const when = ago === null ? "저장 기록 없음" : ago < 60_000 ? "방금 저장" : `마지막 저장 ${Math.floor(ago / 60_000)}분 전`;
+    const unsaved = s.unsavedCaught ? ` · 미저장 ${s.unsavedCaught}마리` : s.dirty ? " · 미저장 항해" : "";
+    return { text: `${when}${unsaved}`, nag: (s.dirty || s.unsavedCaught > 0) && (ago === null || ago > NAG_AFTER_MS) };
+  }
+
+  /** 로비로 / 종료 (design §11-2): with unsaved progress, ask 저장하고 / 저장 안 하고 / 취소. */
+  leave(kind: "lobby" | "quit"): void {
+    const go = () => (kind === "lobby" ? this.toTitle() : this.quit?.());
+    if (!this.hasUnsaved()) return go();
+    const what = kind === "quit" ? "종료" : "나가기";
+    this.engine.modal = new Modal({
+      title: kind === "quit" ? "종료" : "로비로",
+      lines: ["저장하지 않은 기록이 있어요.", this.saveLabel()?.text ?? ""],
+      buttons: [
+        { id: "save", label: `저장하고 ${what}` },
+        { id: "drop", label: `저장 안 하고 ${what}` },
+        { id: "cancel", label: "취소" },
+      ],
+      cancel: "cancel",
+      onPick: async (id, m) => {
+        if (id === "cancel") return void (this.engine.modal = null);
+        if (id === "save") {
+          m.busy = true;
+          m.note = "저장 중…";
+          const r = await this.commit(kind === "quit" ? "exit" : "lobby");
+          m.busy = false;
+          if (!r.ok) {
+            m.note = r.message;
+            m.noteColor = lutHex("red2");
+            return;
+          }
+        } else {
+          this.backend.discardUnsaved?.();
+          this.frozen = true; // scene exits must not write the dropped world back
+        }
+        this.engine.modal = null;
+        go();
+      },
+    });
+  }
+
+  /** Crash / closed-tab leftovers (design §11-5): offer to save them now. */
+  offerRecovery(): void {
+    if (!this.backend.pendingRecovery?.()) return;
+    this.engine.modal = new Modal({
+      title: "복구",
+      lines: ["저장되지 않은 기록이 있습니다.", "복구할까요?"],
+      buttons: [
+        { id: "recover", label: "복구하고 저장" },
+        { id: "drop", label: "버리기" },
+      ],
+      onPick: async (id, m) => {
+        if (id === "drop") {
+          this.backend.discardUnsaved?.();
+          this.engine.modal = null;
+          return;
+        }
+        m.busy = true;
+        m.note = "저장 중…";
+        const r = await this.commit("recover");
+        m.busy = false;
+        if (!r.ok) {
+          m.note = r.message;
+          m.noteColor = lutHex("red2");
+          return;
+        }
+        this.engine.modal = null;
+        this.flash(r.message, 3);
+      },
+    });
+  }
+
+  flash(textLine: string, seconds = 2.5, color?: string): void {
+    this.flashMsg = { text: textLine, until: performance.now() + seconds * 1000, color };
+  }
+
+  /** Scenes call this last in render: the save result banner. */
+  drawFlash(ctx: CanvasRenderingContext2D, assets: Assets): void {
+    const f = this.flashMsg;
+    if (!f || performance.now() > f.until) return;
+    const w = Math.max(140, textWidth(ctx, f.text) + 28);
+    panel(ctx, assets, "panel_sea", 320 - w / 2, 300, w, 26);
+    text(ctx, f.text, 320, 307, { align: "center", color: f.color });
+  }
+
+  /** Small HUD line with the save status (full build). */
+  drawSaveLabel(ctx: CanvasRenderingContext2D, assets: Assets, x: number, y: number, align: CanvasTextAlign = "left"): void {
+    const l = this.saveLabel();
+    if (!l) return;
+    const blink = l.nag && Math.floor(performance.now() / 500) % 2 === 0;
+    if (l.nag) assets.draw(ctx, "ui", "icon_save", align === "left" ? x : x - textWidth(ctx, l.text) - 18, y - 3);
+    text(ctx, l.text, l.nag && align === "left" ? x + 18 : x, y, { align, color: blink ? lutHex("yellow") : lutHex("foam2") });
   }
 
   // ── scenes ──
@@ -59,6 +213,7 @@ export class Game {
 
   /** After 이어하기 / 새 게임: back where the save left off — tied up at an island or out at sea. */
   play(): void {
+    this.frozen = false;
     this.worldState = this.backend.world();
     this.clock.hours = this.world.hour;
     const at = this.world.at;
@@ -67,6 +222,7 @@ export class Game {
     else this.toIsland(START_ISLAND.id);
   }
 
+  /** Tie up at an island. Arriving from the sea is an autosave event (design §11-2). */
   toIsland(id: string, note?: ArrivalNote): void {
     this.world.at = { kind: "island", id };
     this.save();

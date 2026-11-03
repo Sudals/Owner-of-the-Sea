@@ -4,7 +4,7 @@ import { Engine } from "./engine";
 import { Game, type BuildMode } from "./game";
 
 export { Assets, ATLASES, BACKGROUNDS, lutHex, type AtlasName, type BgName, type Frame } from "./assets";
-export type { CastRecord, CastResult, FishingSession, GameBackend, Gear, HoldItem, Profile, WorldState } from "./backend";
+export type { CastRecord, CastResult, FishingSession, GameBackend, Gear, HoldItem, Profile, SaveOutcome, SaveReason, SaveStatus, SessionSpot, WorldState } from "./backend";
 export { Game, type BuildMode } from "./game";
 export { Settings, type SettingsData } from "./settings";
 export { TitleScene, type TitleState } from "./scenes/title";

@@ -5,7 +5,7 @@
 import { mkdirSync } from "node:fs";
 import { chromium } from "playwright";
 
-const BASE = process.argv[2] ?? "http://localhost:5173";
+const BASE = process.argv[2] ?? "http://localhost:5173/?local"; // LocalBackend (no server)
 const OUT = process.argv[3] ?? "screenshots";
 mkdirSync(OUT, { recursive: true });
 

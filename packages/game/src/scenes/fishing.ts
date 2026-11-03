@@ -1,7 +1,7 @@
 import { FISH_BY_ID, GRADE_LABEL, omenCastIndex, POINT_BY_ID, rollCast, START_ISLAND, type CastRoll, type FishData, type FishingPoint } from "@sea/shared";
 import type { LutName } from "@sea/sprites/palette";
 import { lutHex, type BgName } from "../assets";
-import type { CastResult, FishingSession, GameBackend } from "../backend";
+import type { CastResult, FishingSession, GameBackend, SessionSpot } from "../backend";
 import type { Engine, Scene } from "../engine";
 import type { Game } from "../game";
 import { pixelCurve, pixelLine } from "../render/pixels";
@@ -135,11 +135,20 @@ export class FishingScene implements Scene {
   private async open(): Promise<void> {
     this.state = { k: "loading" };
     try {
-      this.session = await this.backend.openSession(spotIdOf(this.spot));
+      const sp = this.spot, w = this.game?.world;
+      const req: SessionSpot = {
+        spotId: spotIdOf(sp),
+        pointId: poolOf(sp),
+        at: sp.kind === "boat" && w?.at.kind === "sea" ? { x: w.at.x, y: w.at.y } : undefined,
+        clockH: this.game?.clockH,
+        deep: sp.kind === "boat" ? !!sp.deep : false,
+        storm: sp.kind === "boat" ? !!sp.storm : false,
+      };
+      this.session = await this.backend.openSession(req);
       this.state = { k: "idle", t: 0 };
     } catch (e) {
-      console.error(e);
-      this.say("낚시 포인트를 열지 못했다. 잠시 후 다시 시도해 주세요.", 5);
+      console.warn("[fishing] open", e);
+      this.say(e instanceof Error && e.message ? e.message : "낚시 포인트를 열지 못했다. 잠시 후 다시 시도해 주세요.", 6);
     }
   }
 
@@ -190,7 +199,7 @@ export class FishingScene implements Scene {
     if (this.updatePause(engine)) return;
     // the "leave" button (top-right) — only between casts, and it eats the click
     if (this.game && engine.input.clicked && inRect(engine.input.clicked, LEAVE_BTN)) {
-      if (this.state.k === "idle") return this.leave();
+      if (this.state.k === "idle" || this.state.k === "loading") return this.leave();
       return;
     }
     this.t += dt;
@@ -276,7 +285,8 @@ export class FishingScene implements Scene {
     return [
       { id: "resume", label: "계속하기", rect: { x, y: 150, w, h: 20 } },
       { id: "leave", label: this.leaveLabel, rect: { x, y: 176, w, h: 20 } },
-      { id: "title", label: "로비로 나가기", rect: { x, y: 202, w, h: 20 } },
+      { id: "save", label: "저장", rect: { x, y: 202, w, h: 20 } },
+      { id: "title", label: "로비로 나가기", rect: { x, y: 228, w, h: 20 } },
     ];
   }
 
@@ -302,7 +312,13 @@ export class FishingScene implements Scene {
     const id = items[go]?.id;
     if (id === "resume") this.pause = null;
     else if (id === "leave") this.leave();
-    else if (id === "title") this.game!.toTitle();
+    else if (id === "save") {
+      this.pause = null;
+      void this.game!.manualSave();
+    } else if (id === "title") {
+      this.pause = null;
+      this.game!.leave("lobby");
+    }
     return true;
   }
 
@@ -312,7 +328,9 @@ export class FishingScene implements Scene {
     const i = sess.nextIndex++;
     const pollutant = sess.omenFrom !== null && omenCastIndex(sess.seed, sess.omenFrom) === i;
     const spot = this.spot;
-    const roll = rollCast(sess.seed, i, this.point, { pollutant, deep: spot.kind === "boat" ? spot.deep : undefined, storm: spot.kind === "boat" && !!spot.storm });
+    // the session's conditions are the ones that count (the server fixes them in the full build)
+    const conds = sess.conds ?? { deep: spot.kind === "boat" && !!spot.deep, storm: spot.kind === "boat" && !!spot.storm };
+    const roll = rollCast(sess.seed, i, this.point, { pollutant, deep: conds.deep, storm: conds.storm });
     const fish = FISH_BY_ID[roll.fishId]!;
     // fake nibbles before the real bite: purely visual
     const nibbles = Array.from({ length: Math.floor(Math.random() * 3) }, () => 0.6 + Math.random() * Math.max(0.2, roll.waitSec - 1.4)).sort((a, b) => a - b);
@@ -321,7 +339,7 @@ export class FishingScene implements Scene {
 
   private finishCast(h: Hooked, result: CastResult, reelMs: number): void {
     if (!this.session) return;
-    this.backend.recordCast(this.session.sessionId, { i: h.i, fishId: h.roll.fishId, sizeCm: h.roll.sizeCm, result, reelMs, t: Date.now() });
+    this.backend.recordCast(this.session.sessionId, { i: h.i, fishId: h.roll.fishId, sizeCm: h.roll.sizeCm, result, reelMs, t: Date.now(), seaT: this.game?.world.seaTime });
   }
 
   private moveAmbient(dt: number): void {
@@ -577,13 +595,15 @@ export class FishingScene implements Scene {
     }
     if (s.k === "loading") text(ctx, "…", 320, 170, { align: "center" });
 
-    if (this.game && !this.pause) button(ctx, assets, s.k === "idle" ? "normal" : "disabled", `◀ ${this.leaveLabel}`, LEAVE_BTN.x, LEAVE_BTN.y, LEAVE_BTN.w, LEAVE_BTN.h);
+    if (this.game && !this.pause) button(ctx, assets, s.k === "idle" || s.k === "loading" ? "normal" : "disabled", `◀ ${this.leaveLabel}`, LEAVE_BTN.x, LEAVE_BTN.y, LEAVE_BTN.w, LEAVE_BTN.h);
     if (this.pause) {
       dim(ctx, 0.5);
-      panel(ctx, assets, "panel_wood", 320 - 90, 114, 180, 122);
+      panel(ctx, assets, "panel_wood", 320 - 90, 114, 180, 148);
       text(ctx, "일시정지", 320, 126, { align: "center", color: lutHex("bark1"), shadow: null, font: "bold 12px Galmuri11, monospace" });
       this.pauseItems().forEach((it, i) => button(ctx, assets, i === this.pause!.sel ? "hover" : "normal", it.label, it.rect.x, it.rect.y, it.rect.w, it.rect.h));
     } else if (s.k === "idle" && this.game) text(ctx, "ESC 메뉴", 634, 344, { align: "right", color: lutHex("foam2") });
+    if (this.game && !this.pause) this.game.drawSaveLabel(ctx, assets, 6, engine.dev ? 20 : 8);
+    this.game?.drawFlash(ctx, assets);
 
     if (engine.dev) {
       const line = `${this.clock.label()} ${lut} · ${this.spot.kind === "dock" ? "선착장" : `배 위 (${this.spot.sea})`} · ${s.k} · ${engine.fps}fps  [T]+1h [B]장소 [N]바다`;

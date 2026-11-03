@@ -9,7 +9,7 @@ import { mkdirSync } from "node:fs";
 import { chromium, type Page } from "playwright";
 import { dockFacing, ISLAND_BY_ID, isSolid, MAP_H, MAP_W, mapPoints, seaBlock, stormsAt, TILE, tileAt, type Gear } from "../packages/shared/src/index.ts";
 
-const BASE = process.argv[2] ?? "http://localhost:5173";
+const BASE = process.argv[2] ?? "http://localhost:5173/?local"; // LocalBackend (no server)
 const OUT = process.argv[3] ?? "screenshots";
 mkdirSync(OUT, { recursive: true });
 

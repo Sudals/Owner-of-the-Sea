@@ -18,7 +18,7 @@ const watch = (page) => {
 // 1280×720 viewport → exactly 2× the 640×360 view
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });
 watch(page);
-await page.goto(BASE);
+await page.goto(`${BASE}/?local`); // LocalBackend (no server)
 await page.evaluate(() => localStorage.removeItem("sea.local.v1"));
 await page.reload();
 await page.waitForFunction(() => window.__sea?.ready === true, null, { timeout: 30_000 });
