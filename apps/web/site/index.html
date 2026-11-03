@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0d0f1c" />
+    <meta name="description" content="잠긴 세계 위의 작은 섬에서 시작하는 2D 픽셀 낚시 게임. 브라우저에서 체험판을 바로 해 보세요." />
+    <link rel="icon" type="image/png" href="img/icon-32.png" />
+    <title>바다의 주인</title>
+    <style>
+      @font-face { font-family: "Galmuri11"; src: url("fonts/Galmuri11.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+      @font-face { font-family: "Galmuri11"; src: url("fonts/Galmuri11-Bold.woff2") format("woff2"); font-weight: 700; font-display: swap; }
+      :root {
+        --bg: #0d0f1c; --panel: #1b2335; --ink: #e9f1ef; --muted: #9fb4c0; --sea: #3191b0; --jade: #66c7a0; --sand: #f2d39a; --coral: #e8735d;
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: "Galmuri11", system-ui, sans-serif; }
+      body { min-height: 100vh; display: flex; flex-direction: column; align-items: center; }
+      main { width: 100%; max-width: 960px; padding: 32px 16px 48px; }
+      .hero { position: relative; width: 100%; aspect-ratio: 16 / 9; border: 3px solid #000; box-shadow: 0 0 0 3px var(--panel); background: #000 url("img/hero.png") center / cover no-repeat; image-rendering: pixelated; }
+      .hero .title { position: absolute; right: 18px; bottom: 18px; padding: 12px 18px; background: rgba(13, 15, 28, 0.72); border: 3px solid #000; text-align: right; }
+      .hero h1 { margin: 0; font-size: clamp(26px, 5.5vw, 52px); font-weight: 700; text-shadow: 3px 3px 0 #0d0f1c; letter-spacing: 2px; }
+      .hero p { margin: 6px 0 0; font-size: clamp(12px, 2vw, 17px); color: var(--sand); }
+      .actions { display: flex; flex-wrap: wrap; gap: 12px; margin: 24px 0 8px; }
+      a.btn { display: inline-block; padding: 14px 22px; font-size: 18px; font-weight: 700; color: #0d0f1c; background: var(--sand); text-decoration: none; border: 3px solid #000; box-shadow: 4px 4px 0 #000; }
+      a.btn:hover { transform: translate(-1px, -1px); box-shadow: 5px 5px 0 #000; }
+      a.btn.alt { background: var(--jade); }
+      .note { color: var(--muted); font-size: 14px; margin: 6px 0 0; }
+      section { margin-top: 32px; padding: 20px; background: var(--panel); border: 3px solid #000; }
+      h2 { margin: 0 0 12px; font-size: 20px; color: var(--sand); }
+      ul { margin: 0; padding-left: 20px; line-height: 1.8; }
+      table { border-collapse: collapse; width: 100%; font-size: 14px; }
+      th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #2c3850; vertical-align: top; }
+      th { color: var(--muted); font-weight: 400; }
+      footer { color: var(--muted); font-size: 12px; padding: 16px; text-align: center; }
+      @media (max-width: 520px) { a.btn { width: 100%; text-align: center; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="hero" role="img" aria-label="빨간등대 선착장에서 낚싯대를 든 낚시꾼">
+        <div class="title">
+          <h1>바다의 주인</h1>
+          <p>바다는 누구의 것인가</p>
+        </div>
+      </div>
+      <div class="actions">
+        <a class="btn" href="demo/">브라우저에서 체험하기</a>
+        <a class="btn alt" href="__RELEASE_URL__">Windows 정식판 받기</a>
+      </div>
+      <p class="note">체험판 기록은 이 브라우저에만 저장돼요. 정식판은 이름 하나로 시작하고, 다른 PC에서는 이어하기 코드로 이어서 해요.</p>
+
+      <section>
+        <h2>어떤 게임인가요</h2>
+        <ul>
+          <li>옛 세계가 물에 잠긴 바다. 할아버지의 통통배 한 척으로 빨간등대에서 출발해요.</li>
+          <li>찌를 던지고, 입질에 맞춰 챔질하고, 텐션을 지키며 감아 올리는 손맛 낚시.</li>
+          <li>배를 직접 몰아 옥빛·청빛·남빛·먹빛 네 바다와 섬 13곳을 오가며 물고기를 팔고 배를 키워요.</li>
+          <li>섬마다 시세가 다르고, 신선도는 시간이 갈수록 떨어져요. 언제 어디서 팔지가 승부예요.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>체험판과 정식판</h2>
+        <table>
+          <tr><th></th><th>웹 체험판</th><th>Windows 정식판</th></tr>
+          <tr><th>실행</th><td>이 페이지에서 바로</td><td>설치 파일 / 포터블 exe</td></tr>
+          <tr><th>저장</th><td>이 브라우저 (오프라인도 OK)</td><td>서버 저장 · 다른 PC는 이어하기 코드</td></tr>
+          <tr><th>조작</th><td colspan="2">마우스 / 키보드 (Space·방향키·Q/E·I·M) / 게임패드</td></tr>
+        </table>
+      </section>
+    </main>
+    <footer>바다의 주인 · __VERSION__ · 글꼴 Galmuri (OFL)</footer>
+  </body>
+</html>

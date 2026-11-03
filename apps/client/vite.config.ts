@@ -5,6 +5,9 @@ import { defineConfig } from "vite";
 // design §2, §9. Each mode builds into its own folder.
 export default defineConfig(({ mode }) => ({
   plugins: [react()],
+  // the web demo runs from any folder (/demo/ on the site, an itch.io iframe): relative URLs.
+  // The full build is served from app://bundle/ by the desktop shell.
+  base: mode === "demo" ? "./" : "/",
   define: {
     __BUILD_MODE__: JSON.stringify(mode === "demo" ? "demo" : "full"),
   },
