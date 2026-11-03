@@ -68,6 +68,11 @@ export class Engine {
     this.resize();
   }
 
+  /** The active scene (read-only; used by tests and the React HUD). */
+  get currentScene(): Scene | null {
+    return this.scene;
+  }
+
   setScene(scene: Scene): void {
     this.scene?.exit?.(this);
     this.scene = scene;

@@ -105,6 +105,21 @@ export class Assets {
     } else ctx.drawImage(src, f.x, f.y, f.w, f.h, x, y, f.w, f.h);
   }
 
+  /** Draw a sub-rectangle of a frame, scaled (nearest-neighbour) into a destination rect — for 9-slices and bars. */
+  drawPart(
+    ctx: CanvasRenderingContext2D,
+    atlas: AtlasName,
+    name: string,
+    sx: number, sy: number, sw: number, sh: number,
+    dx: number, dy: number, dw: number, dh: number,
+    lut: LutName = "day",
+  ): void {
+    const entry = this.atlases.get(atlas);
+    if (!entry || sw <= 0 || sh <= 0 || dw <= 0 || dh <= 0) return;
+    const f = this.frame(atlas, name);
+    ctx.drawImage(this.source(`atlas:${atlas}`, entry.img, lut), f.x + sx, f.y + sy, sw, sh, Math.round(dx), Math.round(dy), Math.round(dw), Math.round(dh));
+  }
+
   /** A full-screen background, recolored for the LUT. */
   background(name: BgName, lut: LutName = "day"): CanvasImageSource {
     const img = this.images.get(name);

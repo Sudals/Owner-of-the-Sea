@@ -1,5 +1,6 @@
 import { createGame, type Engine } from "@sea/game";
 import { useEffect, useRef, useState } from "react";
+import { LocalBackend } from "./backend/LocalBackend";
 import { loadFonts } from "./fonts";
 
 // Mounts the pure-TS engine (packages/game) and tears it down on unmount (design §9).
@@ -14,7 +15,10 @@ export function GameCanvas() {
     (async () => {
       try {
         await loadFonts();
+        // demo and full both use the local backend until RemoteBackend lands (M4)
+        const backend = new LocalBackend();
         const e = await createGame(host.current!, {
+          backend,
           assetBase: `${import.meta.env.BASE_URL}assets/`,
           dev: import.meta.env.DEV,
           // a cancelled (StrictMode double-mount) load must not overwrite the live one's state
@@ -24,7 +28,7 @@ export function GameCanvas() {
         engine = e;
         setProgress("");
         // test hook for the Playwright smoke/screenshot script
-        (window as unknown as { __sea?: unknown }).__sea = { engine: e, ready: true };
+        (window as unknown as { __sea?: unknown }).__sea = { engine: e, backend, ready: true };
       } catch (err) {
         console.error(err);
         setError(err instanceof Error ? err.message : String(err));
