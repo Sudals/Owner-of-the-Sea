@@ -92,6 +92,9 @@ const fromLobby = async (name) => {
     await page.keyboard.insertText(name);
     await page.keyboard.press("Enter");
   }
+  // the save starts tied up at 빨간등대 → 선착장에서 낚시
+  await page.waitForFunction(() => window.__sea.engine.currentScene.state.k === "island", null, { timeout: 15_000 });
+  await page.keyboard.press("Enter");
 };
 
 await page.goto(BASE);

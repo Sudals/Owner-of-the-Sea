@@ -26,7 +26,32 @@ export type CastRecord = {
   t: number;
 };
 
-export type HoldItem = { fishId: string; sizeCm: number; spotId: string; caughtAt: string };
+export type HoldItem = {
+  fishId: string;
+  sizeCm: number;
+  spotId: string;
+  caughtAt: string;
+  /** WorldState.seaTime when caught — freshness drops with time at sea after this (design §3-3). */
+  freshAt?: number;
+};
+
+/** Where the player is and what the boat has (design §3-3, §3-4, §8 players). */
+export type WorldState = {
+  at: { kind: "island"; id: string } | { kind: "sea"; x: number; y: number; heading: number };
+  hullLv: 1 | 2 | 3 | 4;
+  hullHp: number;
+  fuel: number;
+  fuelTank: boolean;
+  lantern: boolean;
+  iceLv: number;
+  day: number;
+  /** Game clock, 0–24. */
+  hour: number;
+  /** Seconds spent at sea, all-time (the freshness clock). */
+  seaTime: number;
+  /** Fog of war on the 해도: one bit per map tile, base64. */
+  chart: string;
+};
 
 export type Gear = { rodLv: number; lineLv: number };
 
@@ -49,6 +74,13 @@ export interface GameBackend {
   gear(): Gear;
   /** Unsold fish in the boat's hold (score is credited when sold — design v9 §4-4). */
   hold(): HoldItem[];
+  /** Drop hold items (e.g. lost when the boat is towed). */
+  dropHold(indices: number[]): void;
+
+  // ── world (design §3-3, §11-2): where the boat is, fuel, hull, chart ──
+  world(): WorldState;
+  /** Keep the world state. Local builds write it straight away; the server sees it on the next save. */
+  saveWorld(w: WorldState): void;
 
   // ── profile (lobby, design §5 / §7-3) ──
   /** This device's player, or null on a first run. */

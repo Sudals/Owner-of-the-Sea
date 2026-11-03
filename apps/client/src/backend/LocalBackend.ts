@@ -1,5 +1,5 @@
-import type { CastRecord, FishingSession, GameBackend, Gear, HoldItem, Profile } from "@sea/game";
-import { newSeedHex } from "@sea/shared";
+import type { CastRecord, FishingSession, GameBackend, Gear, HoldItem, Profile, WorldState } from "@sea/game";
+import { FUEL, HULLS, newSeedHex, START_ISLAND } from "@sea/shared";
 
 // Demo-build backend (design §2, §7, §11-5): everything in localStorage, seeds made locally.
 // The player is just a name kept in this browser (design §5) — no server, no 이어하기 코드.
@@ -19,9 +19,25 @@ type Store = {
   journal: { sessionId: string; cast: CastRecord }[];
   hold: HoldItem[];
   gear: Gear;
+  world: WorldState;
 };
 
-const fresh = (): Store => ({ profile: null, sessions: {}, journal: [], hold: [], gear: { rodLv: 1, lineLv: 1 } });
+/** A new player: tied up at 빨간등대 with grandfather's 통통배 (design §3-1, §3-4). */
+const freshWorld = (): WorldState => ({
+  at: { kind: "island", id: START_ISLAND.id },
+  hullLv: 1,
+  hullHp: HULLS[1].hp,
+  fuel: FUEL.base,
+  fuelTank: false,
+  lantern: false,
+  iceLv: 0,
+  day: 1,
+  hour: 9,
+  seaTime: 0,
+  chart: "",
+});
+
+const fresh = (): Store => ({ profile: null, sessions: {}, journal: [], hold: [], gear: { rodLv: 1, lineLv: 1 }, world: freshWorld() });
 
 export class LocalBackend implements GameBackend {
   private store: Store;
@@ -45,7 +61,8 @@ export class LocalBackend implements GameBackend {
     if (!s) return;
     s.nextIndex = Math.max(s.nextIndex, cast.i + 1);
     this.store.journal.push({ sessionId, cast });
-    if (cast.result === "caught") this.store.hold.push({ fishId: cast.fishId, sizeCm: cast.sizeCm, spotId: s.spotId, caughtAt: new Date(cast.t).toISOString() });
+    if (cast.result === "caught")
+      this.store.hold.push({ fishId: cast.fishId, sizeCm: cast.sizeCm, spotId: s.spotId, caughtAt: new Date(cast.t).toISOString(), freshAt: this.store.world.seaTime });
     this.save();
   }
 
@@ -62,6 +79,22 @@ export class LocalBackend implements GameBackend {
 
   hold(): HoldItem[] {
     return this.store.hold;
+  }
+
+  dropHold(indices: number[]): void {
+    const drop = new Set(indices);
+    this.store.hold = this.store.hold.filter((_, i) => !drop.has(i));
+    this.save();
+  }
+
+  /** The live world object: the game mutates it and calls saveWorld to persist. */
+  world(): WorldState {
+    return this.store.world;
+  }
+
+  saveWorld(w: WorldState): void {
+    this.store.world = w;
+    this.save();
   }
 
   profile(): Profile | null {
@@ -97,7 +130,10 @@ export class LocalBackend implements GameBackend {
   private load(): Store {
     try {
       const raw = this.storage?.getItem(KEY);
-      return raw ? { ...fresh(), ...(JSON.parse(raw) as Partial<Store>) } : fresh();
+      if (!raw) return fresh();
+      const saved = JSON.parse(raw) as Partial<Store>;
+      // saves from before the sea map (M6) have no world: start them tied up at 빨간등대
+      return { ...fresh(), ...saved, world: { ...freshWorld(), ...saved.world } };
     } catch {
       return fresh();
     }

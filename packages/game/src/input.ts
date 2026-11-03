@@ -23,6 +23,8 @@ export class Input {
   private keyHitsStep = new Map<string, number>();
   private padWasDown = false;
   private padHeld = new Set<number>();
+  private keysDown = new Set<string>();
+  private stick = { x: 0, y: 0 };
   private pendingClicks: { x: number; y: number }[] = [];
   private readonly off: (() => void)[] = [];
 
@@ -45,6 +47,7 @@ export class Input {
     on(window, "keydown", (e) => {
       // Enter that commits a Hangul IME composition is not a button press
       if (e.isComposing || e.keyCode === 229) return;
+      if (!(e.target instanceof HTMLInputElement)) this.keysDown.add(e.code);
       if (!e.repeat || e.code.startsWith("Arrow")) this.keyHits.set(e.code, (this.keyHits.get(e.code) ?? 0) + 1);
       if (e.code === "Space" || e.code === "Enter") {
         e.preventDefault();
@@ -52,10 +55,12 @@ export class Input {
       }
     });
     on(window, "keyup", (e) => {
+      this.keysDown.delete(e.code);
       if (e.code === "Space" || e.code === "Enter") this.setSource(`k${e.code}`, false);
     });
     // losing focus must never leave the line reeling forever
     on(window, "blur", () => {
+      this.keysDown.clear();
       for (const s of [...this.sources]) this.setSource(s, false);
     });
   }
@@ -79,6 +84,28 @@ export class Input {
    *  shortcuts. Arrow keys count auto-repeat; the gamepad d-pad and B arrive as Arrow keys / Escape. */
   hit(code: string): number {
     return this.keyHitsStep.get(code) ?? 0;
+  }
+
+  /** Is a key (KeyboardEvent.code) held right now? */
+  held(code: string): boolean {
+    return this.keysDown.has(code);
+  }
+
+  /** Steering vector from arrows/WASD and the gamepad's left stick: x right, y down, length ≤ 1. */
+  axis(): { x: number; y: number } {
+    let x = 0, y = 0;
+    if (this.held("ArrowLeft") || this.held("KeyA")) x -= 1;
+    if (this.held("ArrowRight") || this.held("KeyD")) x += 1;
+    if (this.held("ArrowUp") || this.held("KeyW")) y -= 1;
+    if (this.held("ArrowDown") || this.held("KeyS")) y += 1;
+    if (this.padHeld.has(14)) x -= 1;
+    if (this.padHeld.has(15)) x += 1;
+    if (this.padHeld.has(12)) y -= 1;
+    if (this.padHeld.has(13)) y += 1;
+    x += this.stick.x;
+    y += this.stick.y;
+    const len = Math.hypot(x, y);
+    return len > 1 ? { x: x / len, y: y / len } : { x, y };
   }
 
   destroy(): void {
@@ -105,9 +132,12 @@ export class Input {
     const pads = navigator.getGamepads?.() ?? [];
     let isDown = false;
     const held = new Set<number>();
+    this.stick = { x: 0, y: 0 };
     for (const p of pads) {
       if (!p) continue;
       if (p.buttons[0]?.pressed) isDown = true;
+      const sx = p.axes[0] ?? 0, sy = p.axes[1] ?? 0;
+      if (Math.hypot(sx, sy) > 0.25) this.stick = { x: sx, y: sy };
       for (const b of PAD_KEYS.keys()) if (p.buttons[b]?.pressed) held.add(b);
     }
     if (isDown !== this.padWasDown) this.setSource("pad", isDown);

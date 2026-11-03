@@ -32,6 +32,7 @@ const view = () =>
       profile: sea.backend.profile(),
       settings: { ...sea.game.settings.data },
       pause: s.pause ?? null,
+      island: s.islandId ?? null,
       seed: s.session?.seed ?? null,
       nextIndex: s.session?.nextIndex ?? null,
     };
@@ -92,6 +93,7 @@ v = await waitFor((x) => x.k === "settings");
 check("설정 opens by mouse", v.k === "settings");
 await clickItem("bgm", -10); // the "+" at the right end of the row
 await clickItem("bgm", -10);
+await page.waitForTimeout(50); // a click moves the focus too: let it land before the keys
 await page.keyboard.press("ArrowDown"); // focus sfx
 await page.keyboard.press("ArrowLeft");
 await page.waitForTimeout(100);
@@ -120,8 +122,10 @@ await page.waitForTimeout(150);
 v = await view();
 check("Space does not submit the name", v.k === "name");
 await page.keyboard.press("Enter");
+v = await waitFor((x) => x.k === "island");
+check("Enter starts the game as 바다사람, tied up at 빨간등대", v.profile?.name === "바다사람" && v.island === "red_lighthouse", v.profile?.name);
+await page.keyboard.press("Enter"); // 선착장에서 낚시
 v = await waitFor((x) => x.scene === "fishing" && x.k === "idle");
-check("Enter starts the game as 바다사람", v.profile?.name === "바다사람", v.profile?.name);
 const seed = v.seed;
 
 // one cast so the session has moved on
@@ -133,11 +137,14 @@ await page.keyboard.press("Space"); // pull in early
 v = await waitFor((x) => x.k === "idle", 5000);
 const nextIndex = v.nextIndex;
 
-// ESC → pause → 로비로
+// ESC → pause → 로비로 (third item)
 await page.keyboard.press("Escape");
 v = await waitFor((x) => x.pause !== null);
 await shot("lobby-pause");
 await page.keyboard.press("ArrowDown");
+await page.waitForTimeout(40);
+await page.keyboard.press("ArrowDown");
+await page.waitForTimeout(40);
 await page.keyboard.press("Enter");
 v = await waitFor((x) => x.scene === "title" && x.k === "menu");
 check("ESC → 로비로 returns to the lobby with the save shown", v.profile?.name === "바다사람" && v.sel === 0, `sel=${v.sel}`);
@@ -151,6 +158,8 @@ v = await view();
 check("after reload: lobby, focus on 이어하기", v.scene === "title" && v.sel === 0);
 check("settings survived the reload", v.settings.bgm === 9 && v.settings.sfx === 6);
 await page.keyboard.press("Enter");
+v = await waitFor((x) => x.k === "island");
+await page.keyboard.press("Enter"); // back to the same dock
 v = await waitFor((x) => x.scene === "fishing" && x.k === "idle");
 check("이어하기 resumes the same seed and cast index", v.seed === seed && v.nextIndex === nextIndex, `${v.seed?.slice(0, 8)}… #${v.nextIndex} vs ${seed?.slice(0, 8)}… #${nextIndex}`);
 
@@ -158,6 +167,9 @@ check("이어하기 resumes the same seed and cast index", v.seed === seed && v.
 await page.keyboard.press("Escape");
 await waitFor((x) => x.pause !== null);
 await page.keyboard.press("ArrowDown");
+await page.waitForTimeout(40);
+await page.keyboard.press("ArrowDown");
+await page.waitForTimeout(40);
 await page.keyboard.press("Enter");
 await waitFor((x) => x.scene === "title" && x.k === "menu");
 await page.keyboard.press("ArrowDown");

@@ -17,9 +17,28 @@ import { Clock } from "../systems/timeOfDay";
 // around are scenery. Results are journaled through the GameBackend and saved later (§11).
 
 export type SeaId = "jade" | "azure" | "indigo" | "ink";
-export type Spot = { kind: "dock" } | { kind: "boat"; sea: SeaId; hullLv: 1 | 2 | 3 | 4 };
+export type Spot =
+  | { kind: "dock"; islandId?: string }
+  | {
+      kind: "boat";
+      sea: SeaId;
+      hullLv: 1 | 2 | 3 | 4;
+      /** Species pool (points.ts); defaults to the sea's open-water pool. */
+      pointId?: string;
+      /** The map point the boat stopped at (seaMap.ts) — sessions are per map point. */
+      mapPointId?: string;
+      /** Stopped on a dark deep-sea tile (design §4-8). */
+      deep?: boolean;
+      /** Stopped inside a storm (design §3-3). */
+      storm?: boolean;
+    };
 
-export const spotIdOf = (spot: Spot): string => (spot.kind === "dock" ? START_ISLAND.dockPoint : `${spot.sea}_1`);
+/** Session key: one seed session per dock / per map point (design §11-3). */
+export const spotIdOf = (spot: Spot): string =>
+  spot.kind === "dock" ? `${spot.islandId ?? START_ISLAND.id}_dock` : (spot.mapPointId ?? spot.pointId ?? `${spot.sea}_1`);
+
+/** The species pool + odds for a spot. */
+export const poolOf = (spot: Spot): string => (spot.kind === "dock" ? `${spot.islandId ?? START_ISLAND.id}_dock` : (spot.pointId ?? `${spot.sea}_1`));
 
 const SEA_ORDER: SeaId[] = ["jade", "azure", "indigo", "ink"];
 const ROD_LEN = 34;
@@ -29,6 +48,7 @@ const BOAT_DRAFT = 24; // boat sprite row sitting on the waterline
 const CAST_TIME = 0.6;
 const CHARGE_PERIOD = 1.1;
 const BITE_WINDOW = 0.6; // design §4-1
+const LEAVE_BTN = { x: 508, y: 8, w: 124, h: 18 };
 
 const AMBIENT: Record<"dock" | SeaId, string[]> = {
   dock: ["anchovy", "sardine", "gizzard_shad", "goby", "black_seabream", "halfbeak", "rockfish", "pufferfish", "red_seabream"],
@@ -61,7 +81,7 @@ const LOST_TEXT: Record<LostReason, string> = {
 };
 
 export class FishingScene implements Scene {
-  readonly clock = new Clock(9);
+  private readonly ownClock = new Clock(9);
   state: State = { k: "loading" };
   session: FishingSession | null = null;
   private fish: Ambient[] = [];
@@ -81,7 +101,25 @@ export class FishingScene implements Scene {
   ) {}
 
   get point(): FishingPoint {
-    return POINT_BY_ID[spotIdOf(this.spot)]!;
+    return POINT_BY_ID[poolOf(this.spot)] ?? POINT_BY_ID[`${START_ISLAND.id}_dock`]!;
+  }
+
+  /** The game's shared clock (time runs on across scenes), or a local one when run alone. */
+  get clock(): Clock {
+    return this.game?.clock ?? this.ownClock;
+  }
+
+  /** Where "leave" goes: back to the sea map from a boat, back to the island from its dock. */
+  private get leaveLabel(): string {
+    return this.spot.kind === "boat" ? "바다로 돌아가기" : "섬으로 돌아가기";
+  }
+
+  private leave(): void {
+    if (!this.game) return;
+    if (this.session) this.backend.closeSession(this.session.sessionId);
+    this.session = null;
+    if (this.spot.kind === "boat") this.game.toSea();
+    else this.game.toIsland(this.spot.islandId ?? START_ISLAND.id);
   }
 
   enter(engine: Engine): void {
@@ -150,8 +188,14 @@ export class FishingScene implements Scene {
 
   update(dt: number, engine: Engine): void {
     if (this.updatePause(engine)) return;
+    // the "leave" button (top-right) — only between casts, and it eats the click
+    if (this.game && engine.input.clicked && inRect(engine.input.clicked, LEAVE_BTN)) {
+      if (this.state.k === "idle") return this.leave();
+      return;
+    }
     this.t += dt;
-    this.clock.update(dt);
+    if (this.game) this.game.tick(dt, this.spot.kind === "boat");
+    else this.clock.update(dt);
     const input = engine.input;
     if (engine.dev) this.devKeys(engine);
     if (this.toast && this.t > this.toast.until) this.toast = null;
@@ -230,8 +274,9 @@ export class FishingScene implements Scene {
   private pauseItems() {
     const x = 320 - 70, w = 140;
     return [
-      { id: "resume", label: "계속하기", rect: { x, y: 156, w, h: 20 } },
-      { id: "title", label: "로비로 나가기", rect: { x, y: 182, w, h: 20 } },
+      { id: "resume", label: "계속하기", rect: { x, y: 150, w, h: 20 } },
+      { id: "leave", label: this.leaveLabel, rect: { x, y: 176, w, h: 20 } },
+      { id: "title", label: "로비로 나가기", rect: { x, y: 202, w, h: 20 } },
     ];
   }
 
@@ -256,6 +301,7 @@ export class FishingScene implements Scene {
     const go = input.clicked ? hover : input.pressed ? this.pause.sel : -1;
     const id = items[go]?.id;
     if (id === "resume") this.pause = null;
+    else if (id === "leave") this.leave();
     else if (id === "title") this.game!.toTitle();
     return true;
   }
@@ -265,7 +311,8 @@ export class FishingScene implements Scene {
     const sess = this.session!;
     const i = sess.nextIndex++;
     const pollutant = sess.omenFrom !== null && omenCastIndex(sess.seed, sess.omenFrom) === i;
-    const roll = rollCast(sess.seed, i, this.point, { pollutant });
+    const spot = this.spot;
+    const roll = rollCast(sess.seed, i, this.point, { pollutant, deep: spot.kind === "boat" ? spot.deep : undefined, storm: spot.kind === "boat" && !!spot.storm });
     const fish = FISH_BY_ID[roll.fishId]!;
     // fake nibbles before the real bite: purely visual
     const nibbles = Array.from({ length: Math.floor(Math.random() * 3) }, () => 0.6 + Math.random() * Math.max(0.2, roll.waitSec - 1.4)).sort((a, b) => a - b);
@@ -519,7 +566,9 @@ export class FishingScene implements Scene {
     // status line
     const hold = this.backend.hold().length;
     const gear = this.backend.gear();
-    text(ctx, `${this.point.name} · 창고 ${hold}마리 · 낚싯대 Lv${gear.rodLv} · 줄 Lv${gear.lineLv}`, 6, 344, { color: lutHex("foam2") });
+    const sp = this.spot;
+    const tags = sp.kind === "boat" ? `${sp.deep ? " (심해)" : ""}${sp.storm ? " (폭풍)" : ""}` : "";
+    text(ctx, `${this.point.name}${tags} · 창고 ${hold}마리 · 낚싯대 Lv${gear.rodLv} · 줄 Lv${gear.lineLv}`, 6, 344, { color: lutHex("foam2") });
 
     if (this.toast) {
       const w = Math.max(160, textWidth(ctx, this.toast.text) + 28);
@@ -528,10 +577,11 @@ export class FishingScene implements Scene {
     }
     if (s.k === "loading") text(ctx, "…", 320, 170, { align: "center" });
 
+    if (this.game && !this.pause) button(ctx, assets, s.k === "idle" ? "normal" : "disabled", `◀ ${this.leaveLabel}`, LEAVE_BTN.x, LEAVE_BTN.y, LEAVE_BTN.w, LEAVE_BTN.h);
     if (this.pause) {
       dim(ctx, 0.5);
-      panel(ctx, assets, "panel_wood", 320 - 90, 120, 180, 96);
-      text(ctx, "일시정지", 320, 132, { align: "center", color: lutHex("bark1"), shadow: null, font: "bold 12px Galmuri11, monospace" });
+      panel(ctx, assets, "panel_wood", 320 - 90, 114, 180, 122);
+      text(ctx, "일시정지", 320, 126, { align: "center", color: lutHex("bark1"), shadow: null, font: "bold 12px Galmuri11, monospace" });
       this.pauseItems().forEach((it, i) => button(ctx, assets, i === this.pause!.sel ? "hover" : "normal", it.label, it.rect.x, it.rect.y, it.rect.w, it.rect.h));
     } else if (s.k === "idle" && this.game) text(ctx, "ESC 메뉴", 634, 344, { align: "right", color: lutHex("foam2") });
 
