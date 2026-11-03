@@ -139,6 +139,34 @@ function drum(): Img {
   return ol(img);
 }
 
+// a crushed can: dented, label half peeled
+const CAN = `
+  .GGGGGG.
+  GwGGGgGG
+  GGggggGg
+  rrrRrrcg
+  rcrrRrrg
+  .rrrrRr.
+  .GwwwGg.
+  rrRrrrcg
+  GGGgGGGg
+  .GGGGgg.
+`;
+// an old rubber boot (장화) lying on its side
+const BOOT = `
+  ..jjjj.......
+  ..jhhj.......
+  ..jhjj.......
+  ..jhjj.......
+  ..jhjj.......
+  ..jhjjj......
+  ..jhjjjjjjj..
+  .jhjjjjjjjjj.
+  .jjjjjjjjJjj.
+  .KKKKKKKKKKKK
+  ..K.K.K.K.K..
+`;
+
 // ── relics (16×16 icons) ──
 function trafficLight(): Img {
   const img = new Img(14, 16);
@@ -219,6 +247,8 @@ export function buildProps(): SheetItem[] {
     { name: "trash_tire", img: tire() },
     { name: "trash_net", img: net() },
     { name: "trash_drum", img: drum() },
+    { name: "trash_can", img: ol(grid(CAN, L)) },
+    { name: "trash_boot", img: ol(grid(BOOT, L)) },
     { name: "relic_traffic_light", img: trafficLight() },
     { name: "relic_sign", img: ol(grid(SIGN, L)) },
     { name: "relic_phone", img: phone() },

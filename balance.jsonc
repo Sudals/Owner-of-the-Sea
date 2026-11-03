@@ -133,6 +133,28 @@
       "bait_black":  { "grade": { "uncommon": 1.3, "rare": 2, "legendary": 2 }, "size": { "A": 1.5, "S": 2 }, "rot": 1.5 },
       // 미끼가 없을 때(맨 바늘): 효과 없음, 입질이 늦다
       "none":        { "waitMul": 1.5 }
+    },
+
+    // 쓰레기 (design §1 "낚싯줄에는 옛 세계의 쓰레기가 걸려 올라온다", §6-2).
+    // 캐스트마다 물고기 대신 쓰레기가 걸릴 수 있다. 미끼와 상관없이 걸리고(입질로 치니 미끼는 쓴다),
+    // 창고 한 칸을 차지한다. 섬에서 개당 고정가(markets.*.trashFlat)로 처리하고, 처리하면 2점(진실 이후).
+    //  chance     바다별로 쓰레기가 걸릴 확률 (0.1 = 10%)
+    //  dockBonus  선착장(사람 사는 섬 바로 앞)에서 더하는 확률
+    //  kinds      종류. weight = 걸린 쓰레기 중 이 종류의 비율, bySea = 그 바다에서 weight에 곱하는 값,
+    //             sizeCm = 크기(표시용), power/erratic = 릴 미니게임에서 얼마나 무겁고 흔들리는지
+    "trash": {
+      "chance": { "jade": 0.10, "azure": 0.08, "indigo": 0.07, "ink": 0.14 },
+      "dockBonus": 0.06,
+      "kinds": {
+        "trash_bag":    { "name": "비닐봉지",     "weight": 30, "sizeCm": [20, 45], "power": 0.6, "erratic": 0.15 },
+        "trash_bottle": { "name": "페트병",       "weight": 28, "sizeCm": [15, 30], "power": 0.5, "erratic": 0.05 },
+        "trash_can":    { "name": "찌그러진 깡통", "weight": 16, "sizeCm": [8, 14],  "power": 0.4, "erratic": 0 },
+        "trash_boot":   { "name": "낡은 장화",     "weight": 12, "sizeCm": [25, 35], "power": 1.0, "erratic": 0.1 },
+        "trash_net":    { "name": "그물 뭉치",     "weight": 8,  "sizeCm": [40, 90], "power": 1.8, "erratic": 0.2, "bySea": { "azure": 1.5, "indigo": 2 } },
+        "trash_tire":   { "name": "폐타이어",     "weight": 5,  "sizeCm": [50, 70], "power": 2.4, "erratic": 0 },
+        // 기름 드럼은 깊고 더러운 바다일수록 (먹빛 '버려진 골' = 옛 폐기물 투기 해역)
+        "trash_drum":   { "name": "기름 드럼",     "weight": 2,  "sizeCm": [60, 90], "power": 3.0, "erratic": 0, "bySea": { "indigo": 3, "ink": 8 } }
+      }
     }
   },
 

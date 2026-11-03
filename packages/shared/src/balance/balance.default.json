@@ -764,6 +764,95 @@
    "none": {
     "waitMul": 1.5
    }
+  },
+  "trash": {
+   "chance": {
+    "jade": 0.1,
+    "azure": 0.08,
+    "indigo": 0.07,
+    "ink": 0.14
+   },
+   "dockBonus": 0.06,
+   "kinds": {
+    "trash_bag": {
+     "name": "비닐봉지",
+     "weight": 30,
+     "sizeCm": [
+      20,
+      45
+     ],
+     "power": 0.6,
+     "erratic": 0.15
+    },
+    "trash_bottle": {
+     "name": "페트병",
+     "weight": 28,
+     "sizeCm": [
+      15,
+      30
+     ],
+     "power": 0.5,
+     "erratic": 0.05
+    },
+    "trash_can": {
+     "name": "찌그러진 깡통",
+     "weight": 16,
+     "sizeCm": [
+      8,
+      14
+     ],
+     "power": 0.4,
+     "erratic": 0
+    },
+    "trash_boot": {
+     "name": "낡은 장화",
+     "weight": 12,
+     "sizeCm": [
+      25,
+      35
+     ],
+     "power": 1,
+     "erratic": 0.1
+    },
+    "trash_net": {
+     "name": "그물 뭉치",
+     "weight": 8,
+     "sizeCm": [
+      40,
+      90
+     ],
+     "power": 1.8,
+     "erratic": 0.2,
+     "bySea": {
+      "azure": 1.5,
+      "indigo": 2
+     }
+    },
+    "trash_tire": {
+     "name": "폐타이어",
+     "weight": 5,
+     "sizeCm": [
+      50,
+      70
+     ],
+     "power": 2.4,
+     "erratic": 0
+    },
+    "trash_drum": {
+     "name": "기름 드럼",
+     "weight": 2,
+     "sizeCm": [
+      60,
+      90
+     ],
+     "power": 3,
+     "erratic": 0,
+     "bySea": {
+      "indigo": 3,
+      "ink": 8
+     }
+    }
+   }
   }
  },
  "reel": {

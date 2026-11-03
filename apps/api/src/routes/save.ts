@@ -262,6 +262,7 @@ async function apply(tx: Tx, accountId: string, body: SaveRequest, cur: { versio
 
   // 도감 + notable catches (rare and up, design §8 용량 절약 원칙)
   for (const f of caught) {
+    if (FISH_BY_ID[f.fishId]?.trash) continue; // 쓰레기 isn't a species
     await tx
       .insert(dex)
       .values({ accountId, fishId: f.fishId, maxSizeCm: f.sizeCm, count: 1 })

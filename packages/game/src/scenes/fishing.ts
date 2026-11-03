@@ -4,10 +4,12 @@ import { islandBg, lutHex, type BgName } from "../assets";
 import type { CastResult, FishingSession, GameBackend, SessionSpot } from "../backend";
 import type { Engine, Scene } from "../engine";
 import type { Game } from "../game";
+import { Fx } from "../render/fx";
 import { pixelCurve, pixelLine } from "../render/pixels";
 import { button, dim, gaugeH, gaugeV, inRect, panel, text, textWidth } from "../render/ui";
 import { drawSurface } from "../render/water";
 import { Reel } from "../systems/reel";
+import { InventoryPanel } from "../ui/inventoryPanel";
 import { Clock } from "../systems/timeOfDay";
 
 // Fishing spot scene (design §4-1, §4-2; roadmap M3). One button drives everything:
@@ -91,6 +93,11 @@ export class FishingScene implements Scene {
   private toast: { text: string; until: number } | null = null;
   // geometry from the last render, used by update
   private tip: [number, number] = [380, 110];
+  /** Splashes, sparkles, the snap, shake and flashes. */
+  readonly fx = new Fx();
+  private sprayT = 0;
+  /** 창고 · 장비 (I, between casts). */
+  bag: InventoryPanel | null = null;
   private feet: [number, number] = [344, 146];
   /** ESC menu (design §7-3): the world stops while it is open. */
   pause: { sel: number } | null = null;
@@ -197,7 +204,15 @@ export class FishingScene implements Scene {
   // ── update ─────────────────────────────────────────────────────────────────────
 
   update(dt: number, engine: Engine): void {
+    this.fx.update(dt);
+    this.fx.danger = 0;
     if (this.updatePause(engine)) return;
+    if (this.bag) {
+      this.bag.update(engine);
+      if (this.bag.closed) this.bag = null;
+      return;
+    }
+    if (this.game && engine.input.hit("KeyI") && ["idle", "caught", "lost"].includes(this.state.k)) return void (this.bag = new InventoryPanel(this.game));
     // the "leave" button (top-right) — only between casts, and it eats the click
     if (this.game && engine.input.clicked && inRect(engine.input.clicked, LEAVE_BTN)) {
       if (this.state.k === "idle" || this.state.k === "loading") return this.leave();
@@ -243,7 +258,11 @@ export class FishingScene implements Scene {
           this.finishCast(s.hooked, "escaped", 0, false);
           this.state = { k: "lost", t: 0, reason: "reeled_in", hooked: null, from: null };
           this.say(LOST_TEXT.reeled_in, 1.2);
-        } else if (s.t >= s.hooked.roll.waitSec) this.state = { k: "bite", t: 0, hooked: s.hooked, floatX: s.floatX };
+        } else if (s.t >= s.hooked.roll.waitSec) {
+          this.state = { k: "bite", t: 0, hooked: s.hooked, floatX: s.floatX };
+          this.splash(s.floatX, 10, 1); // the float goes under
+          this.fx.shake(1);
+        }
         return;
       case "bite":
         s.t += dt;
@@ -252,15 +271,25 @@ export class FishingScene implements Scene {
           const gear = this.backend.gear();
           const reel = new Reel({ power: fish.power, erratic: fish.erratic, boss: fish.rarity === "boss", rodLv: gear.rodLv, lineLv: gear.lineLv, castPower });
           this.state = { k: "reeling", t: 0, hooked: s.hooked, floatX: s.floatX, reel, fishPos: [s.floatX, this.waterline + 14] };
+          this.splash(s.floatX, 14, 1.3); // strike!
+          this.fx.shake(1.5);
         } else if (s.t >= BITE_WINDOW()) {
           this.finishCast(s.hooked, "escaped", 0);
           this.state = { k: "lost", t: 0, reason: "missed", hooked: s.hooked, from: [s.floatX, this.waterline + 16] };
+          this.fx.ring(s.floatX, this.waterline + 1, "white", 12, 0.6, 0.3);
           this.say(LOST_TEXT.missed);
         }
         return;
       case "reeling": {
         s.t += dt;
         s.reel.update(dt, input.down);
+        // the fish thrashes at the surface; the edges glow red as the line nears breaking
+        this.sprayT += dt;
+        if (s.reel.thrash > 0 && this.sprayT > 0.09) {
+          this.sprayT = 0;
+          this.splash(s.fishPos[0], 3, 0.7);
+        }
+        this.fx.danger = Math.max(0, Math.min(1, (s.reel.tension - 0.82) / 0.15));
         const out = s.reel.outcome;
         if (!out) return;
         const ms = Math.round(s.t * 1000);
@@ -268,9 +297,19 @@ export class FishingScene implements Scene {
           const released = this.holdFull;
           this.finishCast(s.hooked, "caught", ms);
           this.state = { k: "caught", t: 0, hooked: s.hooked, released };
+          this.catchFx(s.hooked.fish, s.fishPos);
         } else {
           this.finishCast(s.hooked, "escaped", ms);
           this.state = { k: "lost", t: 0, reason: out, hooked: s.hooked, from: s.fishPos };
+          if (out === "snapped") {
+            // the line parts with a crack
+            const [tx, ty] = this.tip;
+            this.fx.burst(tx, ty, 10, { colors: ["white", "foam1", "gray2"], speed: [30, 90], g: 260, life: [0.3, 0.6] });
+            this.fx.text(tx, ty - 18, "툭!", "coral", { big: true, life: 1 });
+            this.fx.shake(4);
+            this.fx.flash("red2", 0.6, 1.2);
+          }
+          this.splash(s.fishPos[0], 12, 1);
           this.say(LOST_TEXT[out]);
         }
         return;
@@ -328,6 +367,30 @@ export class FishingScene implements Scene {
     return true;
   }
 
+  /** Water thrown up at x on the surface (side view), with a ring spreading out. */
+  private splash(x: number, n: number, k: number): void {
+    const wl = this.waterline;
+    this.fx.burst(x, wl - 1, n, { colors: ["white", "foam2", "foam1"], speed: [40 * k, 95 * k], dir: -Math.PI / 2, spread: 0.85, g: 340, drag: 0.5, life: [0.35, 0.7] });
+    this.fx.ring(x, wl + 1, "white", 8 + n * 0.8, 0.55, 0.3);
+  }
+
+  /** A catch: the fish breaks the surface, sparkles around the card; rarer = brighter. */
+  private catchFx(fish: FishData, at: [number, number]): void {
+    this.splash(at[0], 18, 1.4);
+    if (fish.trash) {
+      // no sparkle for junk: a dull plop of dirty water
+      this.fx.burst(at[0], this.waterline - 1, 8, { colors: ["gray2", "gray1"], speed: [30, 70], dir: -Math.PI / 2, spread: 0.8, g: 340, drag: 0.5, life: [0.3, 0.6] });
+      return;
+    }
+    const rare = fish.rarity === "rare", top = fish.rarity === "legendary" || fish.rarity === "boss";
+    const colors: Parameters<Fx["burst"]>[3]["colors"] = top ? ["white", "yellow", "peach", "coral"] : rare ? ["white", "yellow", "foam2"] : ["white", "foam2"];
+    this.fx.burst(470, 70, top ? 46 : rare ? 30 : 16, { colors, speed: [30, top ? 120 : 80], life: [0.5, 1.1], drag: 0.2, jitter: 20 });
+    if (top) {
+      this.fx.flash("yellow", 0.5, 1.2);
+      this.fx.shake(3);
+    } else if (rare) this.fx.flash("yellow", 0.25, 2);
+  }
+
   /** Roll the cast from the session seed (design §11-3) and start the wait. */
   private startWaiting(power: number, floatX: number): void {
     const sess = this.session!;
@@ -344,6 +407,7 @@ export class FishingScene implements Scene {
     // fake nibbles before the real bite: purely visual
     const nibbles = Array.from({ length: Math.floor(Math.random() * 3) }, () => 0.6 + Math.random() * Math.max(0.2, roll.waitSec - 1.4)).sort((a, b) => a - b);
     this.state = { k: "waiting", t: 0, hooked: { roll, i, fish, castPower: power, bait }, floatX, nibbles };
+    this.splash(floatX, 6, 0.6); // plop
   }
 
   /** The hold is full: a catch is let go (design §4-4 — time to head for port). */
@@ -390,6 +454,14 @@ export class FishingScene implements Scene {
     const wl = this.waterline;
     const s = this.state;
 
+    // the world shakes (the HUD doesn't)
+    const shake = this.fx.offset();
+    ctx.save();
+    if (shake.x || shake.y) {
+      ctx.fillStyle = lutHex("ink");
+      ctx.fillRect(0, 0, 640, 360);
+      ctx.translate(shake.x, shake.y);
+    }
     ctx.globalAlpha = 1;
     ctx.drawImage(assets.background(this.bgName, a), 0, 0);
     if (t > 0) {
@@ -449,7 +521,11 @@ export class FishingScene implements Scene {
 
     drawSurface(ctx, this.t, wl, this.spot.kind === "dock" ? assets.meta.dock.shoreX - 30 : 0, lut);
     this.drawFloat(ctx, lut);
+    this.fx.draw(ctx, 0, 0, lut);
+    ctx.restore();
+    this.fx.drawScreen(ctx);
     this.drawHud(ctx, engine, lut);
+    this.bag?.render(ctx, engine);
   }
 
   private drawHookedFish(ctx: CanvasRenderingContext2D, fish: FishData, [x, y]: [number, number], lut: LutName, facingAngler = true): void {
@@ -642,13 +718,16 @@ export class FishingScene implements Scene {
     const x = Math.round(cx - w / 2), y = 24;
     panel(ctx, assets, "panel_paper", x, y, w, hgt);
     const ink = lutHex("ink"), muted = lutHex("bark2");
-    text(ctx, "잡았다!", cx, y + 8, { align: "center", color: lutHex("red2"), shadow: null, font: "bold 12px Galmuri11, monospace" });
+    const junk = !!h.fish.trash;
+    text(ctx, junk ? "쓰레기를 건졌다…" : "잡았다!", cx, y + 8, { align: "center", color: lutHex(junk ? "bark2" : "red2"), shadow: null, font: "bold 12px Galmuri11, monospace" });
     assets.draw(ctx, h.fish.sheet, h.fish.id, cx - ff.w / 2, y + 26);
     const tier = h.fish.tier ? ` ${h.fish.tier}` : "";
-    text(ctx, `${h.fish.name}  ${h.roll.sizeCm.toFixed(1)}cm`, cx, y + 32 + ff.h, { align: "center", color: ink, shadow: null });
+    text(ctx, junk ? h.fish.name : `${h.fish.name}  ${h.roll.sizeCm.toFixed(1)}cm`, cx, y + 32 + ff.h, { align: "center", color: ink, shadow: null });
     const s = this.state;
     const released = s.k === "caught" && s.released;
-    text(ctx, `${GRADE_LABEL[h.fish.rarity]}${tier} · 크기 ${h.roll.sizeGrade}급 · ${released ? "창고가 가득 차 놓아주었다" : "창고에 넣었다"}`, cx, y + 46 + ff.h, { align: "center", color: released ? lutHex("red2") : muted, shadow: null });
+    const kept = released ? "창고가 가득 차 놓아주었다" : "창고에 넣었다";
+    const line = junk ? `${released ? "창고가 가득 차 바다에 두었다" : "섬에서 처리하면 몇 G는 받는다"}` : `${GRADE_LABEL[h.fish.rarity]}${tier} · 크기 ${h.roll.sizeGrade}급 · ${kept}`;
+    text(ctx, line, cx, y + 46 + ff.h, { align: "center", color: released ? lutHex("red2") : muted, shadow: null });
     if (t > 0.5 && Math.floor(t * 2) % 2 === 0) text(ctx, "▼", x + w - 16, y + hgt - 16, { color: muted, shadow: null });
   }
 }

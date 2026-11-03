@@ -63,7 +63,24 @@ export function rollCast(seedHex: string, castIndex: number, point: FishingPoint
   const sizeCm = Math.round((min + (max - min) * (lo + r() * (hi - lo))) * 10) / 10;
   const [w0, w1] = b.fishing.waitSec; // design §4-1: 2–8 s
   const waitSec = (w0 + r() * (w1 - w0)) * (bait.waitMul ?? 1); // a bare hook waits longer
+  const junk = opts.pollutant ? null : rollTrash(seedHex, castIndex, point);
+  if (junk) return { ...junk, waitSec };
   return { fishId, sizeCm, sizeGrade, waitSec };
+}
+
+/** 쓰레기 instead of the fish (balance fishing.trash). Its own seeded stream, so a cast that isn't
+ *  trash rolls exactly as it would without trash (and a balance without the section never does). */
+function rollTrash(seedHex: string, castIndex: number, point: FishingPoint): { fishId: string; sizeCm: number; sizeGrade: SizeGrade } | null {
+  const t = balance().fishing.trash;
+  if (!t) return null;
+  const rt = seeded(seedHex, "trash", castIndex);
+  const chance = t.chance[point.sea] + (point.kind === "dock" ? t.dockBonus : 0);
+  if (rt() >= chance) return null;
+  const kinds = Object.entries(t.kinds).map(([id, k]) => [id, k.weight * (k.bySea?.[point.sea] ?? 1)] as const).filter(([, w]) => w > 0);
+  if (!kinds.length) return null;
+  const fishId = weighted(rt, kinds);
+  const [min, max] = t.kinds[fishId]!.sizeCm;
+  return { fishId, sizeCm: Math.round((min + (max - min) * rt()) * 10) / 10, sizeGrade: "B" };
 }
 
 /** 대형: the middle of the species' size range is at least economy.largeFromCm. */

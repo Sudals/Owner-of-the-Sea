@@ -1,5 +1,5 @@
 import type { CastRecord, DexEntry, Gear, HoldItem, Inventory, WorldState } from "@sea/game";
-import { applyOp, balance, BARE_HOOK, kstDate, type Ledger, type MarketLog, type OpResult, type ShopOp } from "@sea/shared";
+import { applyOp, balance, BARE_HOOK, FISH_BY_ID, kstDate, type Ledger, type MarketLog, type OpResult, type ShopOp } from "@sea/shared";
 
 // Both backends trade through the same shared rules the server re-applies (shared/economy.ts).
 
@@ -55,7 +55,7 @@ export function castOn(s: { hold: HoldItem[]; inventory: Inventory; dex: DexEntr
     freshAt: cast.seaT ?? seaTime,
     ...(rot ? { rot } : {}),
   });
-  addToDex(s.dex, cast.fishId, cast.sizeCm);
+  if (!FISH_BY_ID[cast.fishId]?.trash) addToDex(s.dex, cast.fishId, cast.sizeCm); // 쓰레기 isn't a species
 }
 
 /** Count a kept catch in the 도감. */

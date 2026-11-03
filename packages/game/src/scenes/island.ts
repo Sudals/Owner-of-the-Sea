@@ -9,7 +9,9 @@ import type { Engine, Scene } from "../engine";
 import type { Game } from "../game";
 import { button, dim, inRect, panel, text, textWidth, type ButtonState } from "../render/ui";
 import { drawSurface } from "../render/water";
+import { Fx } from "../render/fx";
 import { DexPanel } from "../ui/dexPanel";
+import { InventoryPanel } from "../ui/inventoryPanel";
 
 // 섬 (design §3-1, §7-3; Economy.md §2–5): the island hub. The village's keeper and line, then
 // what the island offers — 시장 (sell the hold), 상점, 연료, 수리, 덕배 할멈's worms — plus the 도감,
@@ -49,10 +51,10 @@ const ROW_H = 18;
 const MARKET_ROWS = 11;
 const SHOP_ROWS = 10;
 
-type Action = "market" | "shop" | "fuel" | "repair" | "gift" | "dex" | "fish" | "sail" | "save" | "title";
+type Action = "market" | "shop" | "fuel" | "repair" | "gift" | "dex" | "bag" | "fish" | "sail" | "save" | "title";
 type MenuItem = { id: Action; label: string; disabled?: boolean };
 type Row = { fishId: string; items: HoldItem[]; total: number; sellable: boolean; fresh: number; special: boolean; demand: string };
-type Sub = { k: "market"; sel: number; scroll: number } | { k: "shop"; sel: number; scroll: number } | { k: "dex"; dex: DexPanel };
+type Sub = { k: "market"; sel: number; scroll: number } | { k: "shop"; sel: number; scroll: number } | { k: "dex"; dex: DexPanel } | { k: "bag"; bag: InventoryPanel };
 
 const FONT_B = "bold 12px Galmuri11, monospace";
 
@@ -85,6 +87,9 @@ function wrap(ctx: CanvasRenderingContext2D, s: string, w: number, maxLines = 3)
   return out;
 }
 
+/** Where the angler stands on the pier (sparkles for a repair). */
+const fxStand = (engine: Engine): [number, number] => engine.assets.meta.dock.stand;
+
 export class IslandScene implements Scene {
   sel = 0;
   private t = 0;
@@ -93,6 +98,8 @@ export class IslandScene implements Scene {
   private sub: Sub | null = null;
   /** Trades since the last save (full build: saved when a panel closes). */
   private traded = false;
+  /** +G / −G floaters, coin sparkles, the tow-in flash. */
+  readonly fx = new Fx();
 
   constructor(
     private readonly game: Game,
@@ -122,6 +129,8 @@ export class IslandScene implements Scene {
     if (this.note?.towed) {
       const parts = ["배가 부서져 끌려왔다", this.note.fee ? `견인·수리 ${this.note.fee}G` : "", this.note.lost ? `물고기 ${this.note.lost}마리를 잃었다` : ""];
       this.say(parts.filter(Boolean).join(" · "), 5, lutHex("coral"));
+      this.fx.flash("red2", 0.5, 0.6);
+      if (this.note.fee) this.fx.text(60, 34, `-${this.note.fee}G`, "coral", { big: true, life: 2 });
     }
     // arriving at an island is an autosave (design §11-2)
     if (this.note?.arrived && this.game.remote) {
@@ -177,12 +186,12 @@ export class IslandScene implements Scene {
         items.push({ id: "gift", label: given ? "할멈의 지렁이 · 오늘 받음" : `할멈의 지렁이 ${m.dailyWorms}개 받기`, disabled: given });
       }
     }
-    items.push({ id: "dex", label: "도감" }, { id: "fish", label: "선착장에서 낚시" }, { id: "sail", label: "출항" }, { id: "save", label: "저장" }, { id: "title", label: "로비로 나가기" });
+    items.push({ id: "dex", label: "도감" }, { id: "bag", label: "창고 · 장비" }, { id: "fish", label: "선착장에서 낚시" }, { id: "sail", label: "출항" }, { id: "save", label: "저장" }, { id: "title", label: "로비로 나가기" });
     return items;
   }
 
   private menuRect(i: number) {
-    return { x: PANEL.x + 14, y: PANEL.y + 80 + i * 22, w: PANEL.w - 28, h: 18 };
+    return { x: PANEL.x + 14, y: PANEL.y + 80 + i * 20, w: PANEL.w - 28, h: 18 };
   }
 
   private marketRows(): Row[] {
@@ -228,7 +237,18 @@ export class IslandScene implements Scene {
     this.game.save(); // fuel/hull as they are now
     const r = this.game.backend.trade({ ...op, island: this.islandId, t: Date.now() } as ShopOp);
     this.say(r.message, 2.5, r.ok ? undefined : lutHex("coral"));
-    if (r.ok) this.traded = true;
+    if (r.ok) {
+      this.traded = true;
+      // money moves: a number off the purse, coins for a sale
+      // next to the purse: the status bar, or the panel's 보유 line when one is open
+      const [px, py] = this.sub ? [BIG.x + BIG.w - 50, BIG.y + 26] : [60, 34];
+      if (r.gold > 0) {
+        this.fx.text(px, py, `+${r.gold}G`, "yellow", { big: true, life: 1.6 });
+        this.fx.burst(px - 10, py - 8, 18, { colors: ["white", "yellow", "sand1"], speed: [30, 90], g: 160, drag: 0.4, life: [0.5, 1] });
+      } else if (r.gold < 0) this.fx.text(px, py, `${r.gold}G`, "coral", { big: true, life: 1.4 });
+      if (op.kind === "gift") this.fx.text(px, py, r.message, "yellow", { life: 1.8 });
+      if (op.kind === "repair") this.fx.burst(fxStand(this.engine)[0], fxStand(this.engine)[1] - 20, 14, { colors: ["white", "yellow"], speed: [20, 50], life: [0.4, 0.8] });
+    } else this.fx.shake(1.5);
     return r.ok;
   }
 
@@ -245,12 +265,14 @@ export class IslandScene implements Scene {
 
   update(dt: number, engine: Engine): void {
     this.t += dt;
+    this.fx.update(dt);
     this.game.tick(dt, false);
     if (this.toast && this.t > this.toast.until) this.toast = null;
     if (engine.dev) this.devKeys(engine);
     if (this.sub) return this.updateSub(engine);
 
     const input = engine.input;
+    if (input.hit("KeyI")) return void (this.sub = { k: "bag", bag: new InventoryPanel(this.game) });
     const items = this.menu();
     const d = input.hit("ArrowDown") + input.hit("KeyS") - input.hit("ArrowUp") - input.hit("KeyW");
     if (d) this.sel = (this.sel + d + items.length * 4) % items.length;
@@ -272,6 +294,9 @@ export class IslandScene implements Scene {
         return;
       case "dex":
         this.sub = { k: "dex", dex: new DexPanel(() => this.game.backend.dex()) };
+        return;
+      case "bag":
+        this.sub = { k: "bag", bag: new InventoryPanel(this.game) };
         return;
       case "fuel":
       case "repair":
@@ -300,6 +325,11 @@ export class IslandScene implements Scene {
     if (sub.k === "dex") {
       sub.dex.update(engine);
       if (sub.dex.closed) this.closeSub();
+      return;
+    }
+    if (sub.k === "bag") {
+      sub.bag.update(engine);
+      if (sub.bag.closed) this.closeSub();
       return;
     }
     if (input.hit("Escape")) return this.closeSub();
@@ -391,12 +421,15 @@ export class IslandScene implements Scene {
     if (this.sub?.k === "market") this.drawMarket(ctx, engine);
     else if (this.sub?.k === "shop") this.drawShop(ctx, engine);
     else if (this.sub?.k === "dex") this.sub.dex.render(ctx, engine);
+    else if (this.sub?.k === "bag") this.sub.bag.render(ctx, engine);
 
     if (this.toast) {
       const tw = Math.max(160, textWidth(ctx, this.toast.text) + 28);
       panel(ctx, assets, "panel_sea", 320 - tw / 2, this.sub ? 2 : 40, tw, 22);
       text(ctx, this.toast.text, 320, (this.sub ? 2 : 40) + 5, { align: "center", color: this.toast.color });
     }
+    this.fx.draw(ctx);
+    this.fx.drawScreen(ctx);
     this.game.drawFlash(ctx, assets);
   }
 
@@ -466,7 +499,7 @@ export class IslandScene implements Scene {
       text(ctx, `×${row.items.length}`, cols.n, y, { color: c, shadow: null });
       const cat = f ? categoryOf(f) : null;
       if (cat !== "polluted" && cat !== "trash") text(ctx, `${freshnessBand(row.fresh).name} ${row.fresh}%`, cols.fresh, y, { color: row.fresh < 40 ? lutHex("coral") : c, shadow: null });
-      if (row.sellable) text(ctx, row.demand, cols.demand, y, { color: row.demand === "부족" ? lutHex("coral") : c, shadow: null });
+      if (row.sellable && cat !== "trash") text(ctx, row.demand, cols.demand, y, { color: row.demand === "부족" ? lutHex("coral") : c, shadow: null });
       if (row.special) text(ctx, "특가", cols.tag, y, { color: lutHex("red2"), shadow: null });
       text(ctx, row.sellable ? `${row.total}G` : "여기선 안 삼", cols.price, y, { align: "right", color: c, shadow: null });
     });

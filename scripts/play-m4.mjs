@@ -197,7 +197,8 @@ check("저장하고 나가기 saved before leaving", me.json?.hold?.length === c
   const o = await api("POST", "/session/open", { spotId: "red_lighthouse_dock" }, tok);
   const s = o.json;
   const forged = { batchId: crypto.randomUUID(), reason: "manual", holdIds: me.json.hold.map((h) => h.id), world: { ...me.json.world }, sessions: [{ sessionId: s.sessionId, sig: s.sig, closed: false, casts: [{ i: s.nextIndex, fishId: "golden_seabream", sizeCm: 99, result: "caught", reelMs: 5000, t: Date.now() }] }] };
-  delete forged.world.hullLv; delete forged.world.fuelTank; delete forged.world.lantern; delete forged.world.iceLv;
+  for (const k of ["hullLv", "tankLv", "holdLv", "lantern", "iceLv"]) delete forged.world[k];
+  forged.ops = [];
   const r1 = await api("POST", "/save", forged, tok);
   check("a forged catch is refused (seed re-roll mismatch)", r1.status === 200 && r1.json.applied.caught === 0 && r1.json.rejected[0]?.why === "mismatch", JSON.stringify(r1.json?.rejected));
   const r2 = await api("POST", "/save", forged, tok);

@@ -90,6 +90,27 @@ export const balanceSchema = z
         pools: z.object({ sea: perSea(z.array(z.string()).min(1)), dock: perSea(z.array(z.string()).min(1)) }).strict(),
         pollutantBySea: perSea(z.string()),
         bait: z.record(z.string(), baitSchema),
+        /** Optional: a balance without it never rolls trash (and rolls exactly as before it existed). */
+        trash: z
+          .object({
+            chance: perSea(z.number().min(0).max(0.9)),
+            dockBonus: z.number().min(0).max(0.5),
+            kinds: z.record(
+              z.string(),
+              z
+                .object({
+                  name: z.string().min(1),
+                  weight: z.number().min(0),
+                  sizeCm: range,
+                  power: z.number().min(0.1).max(20),
+                  erratic: z.number().min(0).max(1),
+                  bySea: z.object({ jade: z.number().min(0), azure: z.number().min(0), indigo: z.number().min(0), ink: z.number().min(0) }).partial().strict().optional(),
+                })
+                .strict(),
+            ),
+          })
+          .strict()
+          .optional(),
       })
       .strict(),
     reel: z
@@ -176,6 +197,7 @@ export const balanceSchema = z
     b.economy.openIslands.forEach((id, i) => b.economy.markets[id] || bad(["economy", "openIslands", i], `markets에 없는 섬: ${id}`));
     for (const [id, f] of Object.entries(b.fish)) if (f.grade === "boss" && !f.tier) bad(["fish", id, "tier"], "오염체는 tier가 필요해요");
     for (const lv of ["1", "2", "3", "4"]) if (!b.boat.hulls[lv]) bad(["boat", "hulls", lv], "선체 Lv1~4가 모두 필요해요");
+    for (const id of Object.keys(b.fishing.trash?.kinds ?? {})) if (fish.has(id)) bad(["fishing", "trash", "kinds", id], `물고기와 같은 id: ${id}`);
   });
 
 export type Balance = z.infer<typeof balanceSchema>;

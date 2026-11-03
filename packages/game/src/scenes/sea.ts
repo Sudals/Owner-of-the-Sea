@@ -7,6 +7,8 @@ import { lutHex } from "../assets";
 import type { Engine, Scene } from "../engine";
 import type { Game } from "../game";
 import { drawChart, Explored, renderChart } from "../render/chart";
+import { drawTinted, Fx } from "../render/fx";
+import { InventoryPanel } from "../ui/inventoryPanel";
 import { pixelLine } from "../render/pixels";
 import { isBaked, SeaView, WORLD_H, WORLD_W } from "../render/seaView";
 import { button, dim, gaugeH, inRect, panel, text, textWidth } from "../render/ui";
@@ -45,6 +47,8 @@ export class SeaScene implements Scene {
   braking = false;
   prompt: Prompt | null = null;
   chartOpen = false;
+  /** 창고 · 장비 (I). */
+  bag: InventoryPanel | null = null;
   pause: { sel: number } | null = null;
   storm = 0;
 
@@ -58,6 +62,13 @@ export class SeaScene implements Scene {
   private hitCooldown = 0;
   /** Storm damage below one whole HP, carried over. */
   private stormWear = 0;
+  /** Hits, splashes, smoke, damage numbers, shake and the red flash. */
+  readonly fx = new Fx();
+  /** Seconds left of the boat's red damage blink. */
+  private hurtT = 0;
+  private smokeT = 0;
+  /** The prompt we last rang a ripple for (a point or a dock), so it rings once on arrival. */
+  private rungFor: string | null = null;
   private wake: Wake[] = [];
   private wakeT = 0;
   private toast: { text: string; until: number; color?: string } | null = null;
@@ -108,6 +119,8 @@ export class SeaScene implements Scene {
       }
       return;
     }
+    this.fx.update(dt);
+    this.hurtT = Math.max(0, this.hurtT - dt);
     if (s.k === "towed") {
       s.t += dt;
       if (s.t > 2.6) {
@@ -122,6 +135,11 @@ export class SeaScene implements Scene {
     if (engine.dev) this.devKeys(engine);
 
     // overlays first: they swallow input and stop the world
+    if (this.bag) {
+      this.bag.update(engine);
+      if (this.bag.closed) this.bag = null;
+      return;
+    }
     if (this.chartOpen) {
       if (input.hit("KeyM") || input.hit("Escape") || input.clicked || input.pressed) this.chartOpen = false;
       return;
@@ -129,6 +147,7 @@ export class SeaScene implements Scene {
     if (this.pause) return this.updatePause(engine);
     if (input.hit("Escape")) return void (this.pause = { sel: 0 });
     if (input.hit("KeyM")) return this.openChart();
+    if (input.hit("KeyI")) return void (this.bag = new InventoryPanel(this.game));
 
     this.game.tick(dt, true);
     if (this.toast && this.t > this.toast.until) this.toast = null;
@@ -140,6 +159,14 @@ export class SeaScene implements Scene {
     const dock = dockNear(this.boat.x, this.boat.y);
     const point = dock ? null : pointNear(this.boat.x, this.boat.y);
     this.prompt = dock ? { kind: "dock", island: dock } : point ? { kind: "fish", point } : null;
+    // arriving in range: a ripple spreads from the spot, once
+    const key = dock ? `dock:${dock.id}` : point ? `point:${point.id}` : null;
+    if (key && key !== this.rungFor) {
+      const [rx, ry] = dock ? [(dock.dock[0] + 0.5) * TILE, (dock.dock[1] + 0.5) * TILE] : [(point!.tx + 0.5) * TILE, (point!.ty + 0.5) * TILE];
+      this.fx.ring(rx, ry, "yellow", 26, 0.9);
+      this.fx.ring(rx, ry, "white", 16, 0.7);
+    }
+    this.rungFor = key;
 
     // ── clicks: HUD buttons, the prompt, else sail there ──
     if (input.clicked) {
@@ -229,7 +256,21 @@ export class SeaScene implements Scene {
     // ── move with collisions ──
     const moved = this.move(dt, spec.radius);
     if (!rowing && moved > 0) w.fuel = Math.max(0, w.fuel - (moved / TILE) * FUEL.perTile);
-    if (!rowing && w.fuel <= 0) this.say("연료가 떨어졌다. 노를 젓는다…", 3);
+    if (!rowing && w.fuel <= 0) {
+      this.say("연료가 떨어졌다. 노를 젓는다…", 3);
+      // the engine coughs out
+      this.fx.burst(b.x - Math.cos(b.heading) * 6, b.y - Math.sin(b.heading) * 6, 10, { colors: ["gray2", "gray1", "navy"], speed: [6, 22], life: [0.8, 1.4], size: 2, drag: 0.3 });
+      this.fx.text(b.x, b.y - 16, "연료 바닥!", "yellow", { life: 1.4 });
+    }
+    // a badly hurt hull smokes
+    if (w.hullHp > 0 && w.hullHp / HULLS[w.hullLv].hp < 0.3) {
+      this.smokeT += dt;
+      if (this.smokeT > 0.2) {
+        this.smokeT = 0;
+        const sx = b.x - Math.cos(b.heading) * 4, sy = b.y - Math.sin(b.heading) * 4;
+        this.fx.burst(sx, sy, 2, { colors: ["white", "gray2", "gray2", "gray1", "gray1"], speed: [8, 18], dir: -Math.PI / 2, spread: 0.6, life: [1.2, 1.9], size: 3, drag: 0.5, jitter: 2 });
+      }
+    }
 
     // ── wake ──
     this.wakeT += dt;
@@ -275,6 +316,9 @@ export class SeaScene implements Scene {
         const n = Math.floor(this.stormWear);
         this.stormWear -= n;
         w.hullHp = Math.max(0, w.hullHp - n);
+        this.fx.text(b.x + 10, b.y - 14, `-${n}`, "coral", { life: 0.9 });
+        this.fx.flash("red2", 0.12, 1.5);
+        this.hurtT = Math.max(this.hurtT, 0.25);
       }
     }
 
@@ -306,6 +350,12 @@ export class SeaScene implements Scene {
     const impact = Math.hypot(b.vx, b.vy);
     if (hit === "sea") {
       // high waves at a sea the hull can't take: shoved back, no damage
+      if (impact > 8) {
+        const a = Math.atan2(b.vy, b.vx);
+        this.fx.burst(b.x + Math.cos(a) * 8, b.y + Math.sin(a) * 8, 14, { colors: ["white", "foam2", "foam1"], speed: [20, 55], dir: a + Math.PI, spread: 1.1, life: [0.35, 0.7] });
+        this.fx.ring(b.x + Math.cos(a) * 8, b.y + Math.sin(a) * 8, "white", 12, 0.5);
+        this.fx.shake(1.5);
+      }
       b.vx *= -0.6;
       b.vy *= -0.6;
       b.speed *= 0.3;
@@ -323,8 +373,15 @@ export class SeaScene implements Scene {
       if (dmg > 0) {
         this.game.world.hullHp = Math.max(0, this.game.world.hullHp - dmg);
         this.hitCooldown = 0.6;
+        this.hitFx(dmg, hit === "reef");
         this.say(hit === "reef" ? `암초에 긁혔다! 선체 -${dmg}` : `부딪혔다! 선체 -${dmg}`, 1.8, lutHex("coral"));
       }
+    }
+    else if (impact > 10 && this.hitCooldown <= 0) {
+      // a soft bump: just spray
+      const a = Math.atan2(b.vy, b.vx), r = HULLS[this.game.world.hullLv].radius;
+      this.fx.burst(b.x + Math.cos(a) * r, b.y + Math.sin(a) * r, 5, { colors: ["white", "foam2"], speed: [10, 30], dir: a + Math.PI, spread: 1.2, life: [0.25, 0.5] });
+      this.hitCooldown = 0.3;
     }
     if (this.target) {
       this.target = null;
@@ -373,6 +430,23 @@ export class SeaScene implements Scene {
 
   /** Hull at 0: towed to the nearest open village, losing part of the hold (Economy.md §4-6).
    *  The fee is paid there on arrival (the tow trade). */
+  /** A hard hit: splinters and spray where the hull struck, the boat blinks red, the view shakes. */
+  private hitFx(dmg: number, reef: boolean): void {
+    const b = this.boat, w = this.game.world;
+    const v = Math.hypot(b.vx, b.vy) || 1, r = HULLS[w.hullLv].radius;
+    const a = Math.atan2(b.vy / v, b.vx / v);
+    const cx = b.x + Math.cos(a) * r, cy = b.y + Math.sin(a) * r;
+    const share = dmg / HULLS[w.hullLv].hp;
+    this.fx.burst(cx, cy, 10 + Math.round(share * 80), { colors: ["sand1", "wood", "bark2", "bark1"], speed: [40, 100], dir: a + Math.PI, spread: 1.4, life: [0.5, 1], drag: 0.12, size: 2 });
+    this.fx.burst(cx, cy, 12, { colors: ["white", "foam2", "foam1"], speed: [15, 50], dir: a + Math.PI, spread: 1.6, life: [0.3, 0.6] });
+    if (reef) this.fx.burst(cx, cy, 6, { colors: ["gray2", "gray1"], speed: [20, 45], life: [0.3, 0.6] });
+    this.fx.ring(cx, cy, "white", 14, 0.5);
+    this.fx.text(b.x, b.y - 18, `-${dmg}`, "coral", { big: true, life: 1.2 });
+    this.fx.shake(2 + share * 40);
+    this.fx.flash("red2", Math.min(0.8, 0.4 + share * 2), 1.2);
+    this.hurtT = 0.6;
+  }
+
   private towed(): void {
     const hold = this.game.backend.hold();
     const lose = Math.floor(hold.length * towLossRate());
@@ -381,6 +455,13 @@ export class SeaScene implements Scene {
     const island = nearestIsland(this.boat.x, this.boat.y, isOpen);
     this.boat.vx = this.boat.vy = this.boat.speed = 0;
     this.state = { k: "towed", t: 0, island, lost: lose };
+    // the hull gives way
+    this.fx.burst(this.boat.x, this.boat.y, 40, { colors: ["wood", "bark2", "bark1", "gray1"], speed: [20, 80], life: [0.6, 1.3], drag: 0.1, size: 2 });
+    this.fx.burst(this.boat.x, this.boat.y, 24, { colors: ["white", "foam2", "foam1"], speed: [15, 60], life: [0.4, 0.9] });
+    this.fx.ring(this.boat.x, this.boat.y, "white", 26, 0.9);
+    this.fx.shake(7);
+    this.fx.flash("red2", 0.75, 0.7);
+    this.hurtT = 1.5;
   }
 
   private openChart(): void {
@@ -396,8 +477,9 @@ export class SeaScene implements Scene {
     return [
       { id: "resume", label: "계속하기", rect: { x, y: 150, w, h: 20 } },
       { id: "chart", label: "해도 보기", rect: { x, y: 176, w, h: 20 } },
-      { id: "save", label: "저장", rect: { x, y: 202, w, h: 20 } },
-      { id: "title", label: "로비로 나가기", rect: { x, y: 228, w, h: 20 } },
+      { id: "bag", label: "창고 · 장비", rect: { x, y: 202, w, h: 20 } },
+      { id: "save", label: "저장", rect: { x, y: 228, w, h: 20 } },
+      { id: "title", label: "로비로 나가기", rect: { x, y: 254, w, h: 20 } },
     ];
   }
 
@@ -414,6 +496,9 @@ export class SeaScene implements Scene {
     else if (id === "chart") {
       this.pause = null;
       this.openChart();
+    } else if (id === "bag") {
+      this.pause = null;
+      this.bag = new InventoryPanel(this.game);
     } else if (id === "save") {
       this.pause = null;
       this.persist();
@@ -461,7 +546,13 @@ export class SeaScene implements Scene {
     // Seen from above, the sea keeps its day colors (a full LUT swap turns the sunset sea into
     // sand); time of day is a light multiply tint laid over the world instead.
     const lut: LutName = "day";
-    const cam = this.camera();
+    const w0 = this.game.world;
+    // the world shakes on a hit (the HUD doesn't)
+    const shake = this.fx.offset(), base = this.camera();
+    const cam = {
+      x: Math.max(0, Math.min(WORLD_W - VIEW_W, base.x + shake.x)),
+      y: Math.max(0, Math.min(WORLD_H - VIEW_H, base.y + shake.y)),
+    };
     this.view.draw(ctx, cam.x, cam.y, VIEW_W, VIEW_H, lut);
     this.drawSparkles(ctx, cam, lut);
     this.drawPoints(ctx, cam, lut);
@@ -486,6 +577,9 @@ export class SeaScene implements Scene {
     this.drawTint(ctx);
     this.drawLabels(ctx, cam); // after the tint: names stay readable at night
     this.drawDocks(ctx, cam);
+    this.fx.draw(ctx, cam.x, cam.y); // splinters, spray, smoke, damage numbers — readable at night too
+    this.fx.danger = w0.hullHp > 0 && w0.hullHp / HULLS[w0.hullLv].hp < 0.2 ? 0.6 : 0;
+    this.fx.drawScreen(ctx);
     this.drawHud(ctx, engine, lut);
 
     if (this.state.k === "towed") {
@@ -495,10 +589,11 @@ export class SeaScene implements Scene {
     }
     if (this.pause) {
       dim(ctx, 0.5);
-      panel(ctx, assets, "panel_wood", 320 - 90, 114, 180, 148);
+      panel(ctx, assets, "panel_wood", 320 - 90, 114, 180, 174);
       text(ctx, "일시정지", 320, 126, { align: "center", color: lutHex("bark1"), shadow: null, font: "bold 12px Galmuri11, monospace" });
       this.pauseItems().forEach((it, i) => button(ctx, assets, i === this.pause!.sel ? "hover" : "normal", it.label, it.rect.x, it.rect.y, it.rect.w, it.rect.h));
     }
+    if (this.bag) this.bag.render(ctx, engine);
     if (this.chartOpen && this.chart) drawChart(ctx, assets, this.chart, this.explored, { boat: this.boat, clockH: this.game.clockH, t: this.t });
     this.game.drawFlash(ctx, assets);
   }
@@ -663,7 +758,11 @@ export class SeaScene implements Scene {
         pixelLine(ctx, ox, oy, ox + Math.cos(a) * 9, oy + Math.sin(a) * 9, lutHex("bark2", lut));
       }
     }
-    this.engine.assets.draw(ctx, "boat_top", `top_lv${w.hullLv}_${dir}`, bx - 16, by - 16, { lut });
+    const frame = `top_lv${w.hullLv}_${dir}`;
+    this.engine.assets.draw(ctx, "boat_top", frame, bx - 16, by - 16, { lut });
+    // damage: the hull blinks red
+    if (this.hurtT > 0 && Math.floor(this.hurtT * 18) % 2 === 0)
+      drawTinted(ctx, 32, 32, bx - 16, by - 16, lutHex("red2"), 0.8, (c) => this.engine.assets.draw(c, "boat_top", frame, 0, 0, { lut }));
   }
 
   private drawStorms(ctx: CanvasRenderingContext2D, cam: { x: number; y: number }): void {
@@ -737,7 +836,9 @@ export class SeaScene implements Scene {
     text(ctx, w.fuel <= 0 ? "노" : `${Math.ceil(w.fuel)}`, 174, 29, { align: "right", color: lutHex("bark1"), shadow: null });
     const hmax = HULLS[w.hullLv].hp;
     assets.draw(ctx, "ui", "icon_repair", 12, 44);
-    gaugeH(ctx, assets, 30, 48, 112, w.hullHp / hmax, w.hullHp / hmax < 0.3 ? lutHex("coral") : lutHex("jade3"));
+    // the hull gauge flashes on a hit, and pulses when the hull is nearly gone
+    const low = w.hullHp / hmax < 0.3, blink = this.hurtT > 0 ? Math.floor(this.hurtT * 18) % 2 === 0 : low && Math.floor(this.t * 3) % 2 === 0;
+    gaugeH(ctx, assets, 30, 48, 112, w.hullHp / hmax, blink ? lutHex(this.hurtT > 0 ? "white" : "red2") : low ? lutHex("coral") : lutHex("jade3"));
     text(ctx, `${w.hullHp}`, 174, 46, { align: "right", color: lutHex("bark1"), shadow: null });
 
     this.game.drawSaveLabel(ctx, assets, 8, 72);

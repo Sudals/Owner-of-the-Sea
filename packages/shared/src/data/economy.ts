@@ -27,6 +27,7 @@ export const SIZE_PRICE_MULT: Readonly<Record<SizeGrade, number>> = live(() => b
 export type Category = "small" | "large" | "deep" | "relic" | "trash" | "polluted";
 export const CATEGORY_NAME: Readonly<Record<Category, string>> = { small: "소형", large: "대형", deep: "심해어", relic: "유물", trash: "쓰레기", polluted: "오염체" };
 export function categoryOf(f: FishData): Category {
+  if (f.trash) return "trash";
   if (f.rarity === "boss") return "polluted";
   if (balance().fish[f.id]?.deep) return "deep";
   return (f.size[0] + f.size[1]) / 2 >= balance().economy.largeFromCm ? "large" : "small";
@@ -265,6 +266,7 @@ export function quoteSale(items: HoldLike[], islandId: string, ctx: SaleCtx): { 
   const each = items.map((h) => {
     const base = unitSalePrice(h, islandId, ctx.date, ctx.clock, ctx.iceLv);
     if (!base) return 0;
+    if (FISH_BY_ID[h.fishId]?.trash) return Math.floor(base); // 쓰레기: a flat price, no 수요
     const n = (nth.get(h.fishId) ?? 0) + 1;
     nth.set(h.fishId, n);
     return Math.max(1, Math.floor(base * demandMult(recentSold(ctx.log, islandId, h.fishId, ctx.now), n)));

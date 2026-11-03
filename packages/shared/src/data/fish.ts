@@ -16,7 +16,9 @@ export type FishData = {
   /** 0–1: how often it thrashes (sudden tension spikes). */
   erratic: number;
   /** Sprite sheet the art lives in. */
-  sheet: "fish" | "pollutants";
+  sheet: "fish" | "pollutants" | "props";
+  /** 쓰레기 (balance fishing.trash): sold at a flat price, no freshness, not in the 도감. */
+  trash?: boolean;
   /** Pollutant tier for bosses (design §4-5). */
   tier?: "C" | "B" | "A" | "S";
 };
@@ -33,7 +35,10 @@ export const FISH: readonly FishData[] = live(
       erratic: x.erratic,
       sheet: x.grade === "boss" ? "pollutants" : "fish",
       ...(x.tier && x.tier !== "SS" ? { tier: x.tier } : {}),
-    })),
+    })).concat(
+      // 쓰레기 kinds ride along as "catches" so the reel, the hold and the market handle them
+      Object.entries(b.fishing.trash?.kinds ?? {}).map(([id, t]): FishData => ({ id, name: t.name, rarity: "common", size: t.sizeCm, power: t.power, erratic: t.erratic, sheet: "props", trash: true })),
+    ),
   ),
   [],
 );
