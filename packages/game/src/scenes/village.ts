@@ -8,7 +8,7 @@ import { button, dim, inRect, panel, text, textWidth } from "../render/ui";
 import { InventoryPanel } from "../ui/inventoryPanel";
 import { Modal } from "../ui/modal";
 import { BIG, MarketPanel, ShopPanel, Trader } from "../ui/trade";
-import { bakeGround, TL } from "../village/ground";
+import { bakeGround, TL, type BakedGround } from "../village/ground";
 import { villageOf, type Facing, type Npc, type Poi, type Prop, type Service, type VillageDef } from "../village/maps";
 
 // 마을 (design §3-1; Economy.md §5): the village of an island, top-down. You walk it (arrows /
@@ -41,7 +41,7 @@ const feetAt = (tx: number, ty: number): [number, number] => [(tx + 0.5) * TL, t
 export class VillageScene implements Scene {
   private engine!: Engine;
   private readonly def: VillageDef;
-  private ground: HTMLCanvasElement | null = null;
+  private ground: BakedGround | null = null;
   /** 1 = can't walk there (water, a building's footprint, a standing villager). */
   private solid: Uint8Array;
   private pc: { x: number; y: number; dir: Facing; moving: boolean; t: number };
@@ -500,8 +500,18 @@ export class VillageScene implements Scene {
     const cam = { x: this.cam.x + shake.x, y: this.cam.y + shake.y };
     ctx.fillStyle = lutHex("jade3");
     ctx.fillRect(0, 0, VIEW_W, VIEW_H);
-    if (this.ground) ctx.drawImage(this.ground, -cam.x, -cam.y);
+    if (this.ground) {
+      ctx.drawImage(this.ground.ground, -cam.x, -cam.y);
+      // the water laps at the shore: two foam rings fading in turn
+      const k = (Math.sin(this.t * 1.7) + 1) / 2;
+      ctx.globalAlpha = 0.2 + 0.8 * k;
+      ctx.drawImage(this.ground.foamIn, -cam.x, -cam.y);
+      ctx.globalAlpha = 0.1 + 0.7 * (1 - k);
+      ctx.drawImage(this.ground.foamOut, -cam.x, -cam.y);
+      ctx.globalAlpha = 1;
+    }
     this.drawWaterGlints(ctx, cam);
+    this.drawShadows(ctx, cam);
 
     // everything that stands, back to front
     type D = { y: number; draw: () => void };
@@ -513,7 +523,12 @@ export class VillageScene implements Scene {
       const [cx, bottom] = anchorOf(p);
       list.push({ y: bottom, draw: () => assets.draw(ctx, "town", name, Math.round(cx - f.w / 2 - cam.x), Math.round(bottom - f.h - cam.y)) });
     }
-    for (const w of this.walkers) list.push({ y: w.y, draw: () => this.drawPerson(ctx, w.def.look, w.x, w.y, w.dir, w.moving ? w.t : 0, cam) });
+    for (const w of this.walkers) {
+      // a keeper behind a counter stands on a crate, so even the children show over it
+      const [tx, ty] = tileOf(w.x, w.y);
+      const lift = this.solid[ty * this.def.w + tx] ? 4 : 0;
+      list.push({ y: w.y, draw: () => this.drawPerson(ctx, w.def.look, w.x, w.y - lift, w.dir, w.moving ? w.t : 0, cam) });
+    }
     list.push({ y: this.pc.y, draw: () => this.drawPerson(ctx, "pc", this.pc.x, this.pc.y, this.pc.dir, this.pc.moving ? this.pc.t : 0, cam) });
     list.sort((a, b) => a.y - b.y);
     for (const d of list) d.draw();
@@ -551,6 +566,27 @@ export class VillageScene implements Scene {
     ctx.fillRect(Math.round(x - 4 - cam.x), Math.round(y - 3 - cam.y), 8, 1);
     ctx.globalAlpha = 1;
     this.engine.assets.draw(ctx, "town", `p_${look}_${dir}_${frame}`, Math.round(x - 8 - cam.x), Math.round(y - 22 - cam.y));
+  }
+
+  /** Every building, tree and prop casts a soft shadow, leaning back and to the right (the
+   *  light comes from the front-left): its own silhouette, flattened onto the ground. */
+  private drawShadows(ctx: CanvasRenderingContext2D, cam: { x: number; y: number }): void {
+    const assets = this.engine.assets, ink = lutHex("ink");
+    ctx.save();
+    ctx.globalAlpha = 0.27;
+    for (const p of this.def.props) {
+      if (p.sprite === "o_rowboat" || p.sprite === "o_flowers") continue; // lying flat already
+      const name = p.anim ? p.anim[0]! : p.sprite;
+      if (!assets.has("town", name)) continue;
+      const f = assets.frame("town", name);
+      const [cx, bottom] = anchorOf(p);
+      ctx.save();
+      ctx.translate(Math.round(cx - cam.x), Math.round(bottom - cam.y));
+      ctx.transform(1, 0, -0.55, 0.32, 0, 0);
+      assets.drawSilhouette(ctx, "town", name, -Math.round(f.w / 2), -f.h, ink);
+      ctx.restore();
+    }
+    ctx.restore();
   }
 
   /** Little glints drifting on the water. */
@@ -612,12 +648,18 @@ export class VillageScene implements Scene {
     ctx.restore();
   }
 
-  /** Names over people near you, and what a keeper says. */
+  /** The name of whoever you'd talk to (or the nearest person), and what a keeper says. */
   private drawLabels(ctx: CanvasRenderingContext2D, cam: { x: number; y: number }): void {
-    for (const w of this.walkers) {
-      if (Math.hypot(w.x - this.pc.x, w.y - this.pc.y) > 3.2 * TL) continue;
-      text(ctx, w.def.name, w.x - cam.x, w.y - 40 - cam.y, { align: "center", color: lutHex("white") });
+    const here = this.near();
+    let who = here?.npc ? this.walkers.find((w) => w.def.id === here.npc) : undefined;
+    if (!who) {
+      let bd = 2.4 * TL;
+      for (const w of this.walkers) {
+        const d = Math.hypot(w.x - this.pc.x, w.y - this.pc.y);
+        if (d < bd) (bd = d), (who = w);
+      }
     }
+    if (who && this.bubble?.npc !== who.def.id) text(ctx, who.def.name, who.x - cam.x, who.y - 40 - cam.y, { align: "center", color: lutHex("white") });
     if (this.bubble) {
       const w = this.walkers.find((x) => x.def.id === this.bubble!.npc);
       if (w) {

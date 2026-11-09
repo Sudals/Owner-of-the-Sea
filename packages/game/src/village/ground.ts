@@ -1,9 +1,12 @@
 import { lutHex } from "../assets";
 import type { Ground, VillageDef } from "./maps";
 
-// Bakes a village's ground into one image, once: textured grass, sand, dirt, decks, rock and
-// salt pans, soft edges between soft grounds, foam where water meets land, a front rim and a
-// shadow where a raft deck meets the water. Day colors — time of day is a tint on top.
+// Bakes a village's ground once. The coast isn't drawn tile by tile: a smoothed land field
+// (bilinear between tile centers, roughened a little) gives rounded shores; water grows
+// lighter toward land; soft grounds fray into each other; raft decks and log rafts float
+// with a front face, a shadow on the water and rope railings where they meet it.
+// Two foam rings along the shore are returned separately — the scene fades them in turn so
+// the water laps at the land. Day colors; time of day is a tint on top.
 
 export const TL = 16;
 
@@ -26,19 +29,13 @@ const hash = (x: number, y: number, s: number) => {
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
 const bayer = (x: number, y: number) => (BAYER[(y & 3) * 4 + (x & 3)]! + 0.5) / 16;
 
-/** Grounds that blend into each other at their edges. */
-const SOFT = new Set<Ground>([".", ",", "s", ":", "w"]);
-const isWater = (t: Ground) => t === "~";
+export const isDeck = (t: Ground) => t === "=" || t === "#";
+const isLand = (t: Ground) => t !== "~" && !isDeck(t);
 
 function texel(t: Ground, x: number, y: number): Col {
   switch (t) {
-    case "~": {
-      if (y % 7 === 0 && (x + Math.floor(y / 7) * 9) % 13 < 3) return "foam1"; // still wave streaks
-      return bayer(x, y) < 0.22 ? "jade2" : "jade3";
-    }
     case ".":
     case ",": {
-      // calm patches (4 px cells), a few lighter blades
       const n = hash(x >> 2, y >> 2, 3);
       if (t === "," && hash(x, y, 9) < 0.03) return (["coral", "yellow", "white", "violet2", "peach"] as Col[])[Math.floor(hash(x, y, 10) * 5)]!;
       if (hash(x, y, 4) < 0.012 && (y & 1) === 0) return "green3";
@@ -54,90 +51,164 @@ function texel(t: Ground, x: number, y: number): Col {
       return cx === 0 && y % 5 === 0 ? "white" : "gray2";
     }
     case "=": {
+      // planks across, staggered joints and nails
       const plank = Math.floor(y / 4);
-      if (y % 4 === 3) return "bark2"; // seam between planks
+      if (y % 4 === 3) return "bark2";
       const joint = (x + plank * 7) % 24;
       if (joint === 0) return "bark2";
-      if (joint === 2 && y % 4 === 1) return "bark1"; // nail
+      if (joint === 2 && y % 4 === 1) return "bark1";
       return plank % 3 === 1 ? (bayer(x, y) < 0.3 ? "sand1" : "wood") : "wood";
     }
+    case "#": {
+      // a raft of round logs running up and down, lashed every tile
+      const log = Math.floor(x / 5), lx = x % 5;
+      if (lx === 4) return "bark1"; // gap between logs
+      if (y % TL === 6 || y % TL === 7) return lx === 0 ? "bark2" : "sand1"; // rope lashing
+      if (lx === 0) return "sand1"; // lit side of the log
+      if (lx === 3) return "bark2";
+      return hash(log, y >> 3, 14) < 0.15 ? "bark2" : "wood";
+    }
     case "r": {
-      // stones: rows of rounded boulders, lit from the top-left
       const row = Math.floor(y / 6), off = (row % 2) * 4;
       const cx = (x + off) % 8, cy = y % 6;
-      if (cx === 7 || cy === 5) return "gray1"; // gaps between stones
-      if ((cx === 0 && cy === 0) || (cx === 6 && cy === 4)) return "gray1"; // rounded corners
+      if (cx === 7 || cy === 5) return "gray1";
+      if ((cx === 0 && cy === 0) || (cx === 6 && cy === 4)) return "gray1";
       if (cy === 0 || cx === 0) return hash(Math.floor((x + off) / 8), row, 11) < 0.5 ? "white" : "gray2";
       if (cy === 4 || cx === 6) return "gray1";
       return "gray2";
     }
     case "w":
       return hash(x, y, 13) < 0.1 ? "foam2" : (x + y) % 9 === 0 ? "foam1" : "white";
+    case "~":
+      return "jade3";
   }
 }
 
-/** Darker shade a land texel takes right at the water's edge (a bevel). */
-const EDGE: Partial<Record<Ground, Col>> = { ".": "green1", ",": "green1", s: "sand1", ":": "wood", r: "gray1", w: "foam1" };
+/** Darker shade a land texel takes right at the shore (a bevel). */
+const EDGE: Partial<Record<Ground, Col>> = { ".": "green1", ",": "green1", s: "sand1", ":": "wood", r: "gray1", w: "foam1", o: "gray1" };
 
-export function bakeGround(def: VillageDef): HTMLCanvasElement {
-  const Wp = def.w * TL, Hp = def.h * TL;
-  const tileAt = (px: number, py: number): Ground => {
-    const tx = Math.floor(px / TL), ty = Math.floor(py / TL);
-    return def.ground[ty]?.[tx] ?? "~";
+export type BakedGround = { ground: HTMLCanvasElement; foamIn: HTMLCanvasElement; foamOut: HTMLCanvasElement };
+
+export function bakeGround(def: VillageDef): BakedGround {
+  const W = def.w, H = def.h, Wp = W * TL, Hp = H * TL;
+  const tile = (tx: number, ty: number): Ground => def.ground[ty]?.[tx] ?? "~";
+  const tileAt = (px: number, py: number): Ground => tile(Math.floor(px / TL), Math.floor(py / TL));
+
+  // land per tile (1/0), and a wider blur of it for the water's depth
+  const land = new Float32Array(W * H), wide = new Float32Array(W * H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) land[y * W + x] = isLand(tile(x, y)) ? 1 : 0;
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      let s = 0, n = 0;
+      for (let dy = -2; dy <= 2; dy++)
+        for (let dx = -2; dx <= 2; dx++) {
+          const xx = x + dx, yy = y + dy;
+          s += xx >= 0 && yy >= 0 && xx < W && yy < H ? land[yy * W + xx]! : 0;
+          n++;
+        }
+      wide[y * W + x] = s / n;
+    }
+  const field = (arr: Float32Array, px: number, py: number) => {
+    const u = px / TL - 0.5, v = py / TL - 0.5;
+    const i = Math.floor(u), j = Math.floor(v), fx = u - i, fy = v - j;
+    const at = (a: number, b: number) => (a >= 0 && b >= 0 && a < W && b < H ? arr[b * W + a]! : 0);
+    return (at(i, j) * (1 - fx) + at(i + 1, j) * fx) * (1 - fy) + (at(i, j + 1) * (1 - fx) + at(i + 1, j + 1) * fx) * fy;
   };
-  const canvas = document.createElement("canvas");
-  canvas.width = Wp;
-  canvas.height = Hp;
-  const ctx = canvas.getContext("2d")!;
-  const img = ctx.createImageData(Wp, Hp);
+  /** Which land a pixel shows: the four nearest tile centers vote, weighted by closeness (with
+   *  a little noise), so borders between grounds come out rounded instead of tile-stepped. */
+  const landAt = (px: number, py: number): Ground => {
+    const u = px / TL - 0.5, v = py / TL - 0.5;
+    const i = Math.floor(u), j = Math.floor(v), fx = u - i, fy = v - j;
+    const votes = new Map<Ground, number>();
+    const corners: [number, number, number][] = [[i, j, (1 - fx) * (1 - fy)], [i + 1, j, fx * (1 - fy)], [i, j + 1, (1 - fx) * fy], [i + 1, j + 1, fx * fy]];
+    for (const [a, b, w] of corners) {
+      const t = tile(a, b);
+      if (!isLand(t)) continue;
+      votes.set(t, (votes.get(t) ?? 0) + w + (hash(px >> 1, py >> 1, 40 + t.charCodeAt(0)) - 0.5) * 0.18);
+    }
+    let best: Ground = "s", bv = -9;
+    for (const [t, w] of votes) if (w > bv) (bv = w), (best = t);
+    return best;
+  };
+
+  const make = () => {
+    const c = document.createElement("canvas");
+    c.width = Wp;
+    c.height = Hp;
+    return c;
+  };
+  const ground = make(), foamIn = make(), foamOut = make();
+  const g = ground.getContext("2d")!, fi = foamIn.getContext("2d")!, fo = foamOut.getContext("2d")!;
+  const img = g.createImageData(Wp, Hp), inner = fi.createImageData(Wp, Hp), outer = fo.createImageData(Wp, Hp);
   const d = img.data;
+  const put = (data: Uint8ClampedArray, x: number, y: number, c: Col, a = 255) => {
+    const [r, gg, b] = rgb(c);
+    const i = (y * Wp + x) * 4;
+    data[i] = r;
+    data[i + 1] = gg;
+    data[i + 2] = b;
+    data[i + 3] = a;
+  };
+
   for (let y = 0; y < Hp; y++)
     for (let x = 0; x < Wp; x++) {
-      const t = tileAt(x, y);
-      let c: Col = texel(t, x, y);
-      if (isWater(t)) {
-        // foam along land, shadow under a deck (the deck stands above the water)
-        const up = tileAt(x, y - 1), up2 = tileAt(x, y - 2), up3 = tileAt(x, y - 3);
-        if (up === "=" || up2 === "=" || up3 === "=") c = up === "=" ? "jade1" : "jade2";
-        else {
-          let near = 9;
-          for (let k = 1; k <= 2 && near === 9; k++)
-            for (const [dx, dy] of [[k, 0], [-k, 0], [0, k], [0, -k]] as const) {
-              const n = tileAt(x + dx, y + dy);
-              if (!isWater(n) && n !== "=") near = Math.min(near, k);
-            }
-          if (near === 1) c = "white";
-          else if (near === 2) c = bayer(x, y) < 0.6 ? "foam2" : c;
-        }
-      } else if (t === "=") {
-        // the raft's front face where it meets the water below, a dark rim at its sides
-        const below = tileAt(x, y + 1), below2 = tileAt(x, y + 2);
-        if (isWater(below)) c = "bark1";
-        else if (isWater(below2)) c = "bark2";
-        else if (isWater(tileAt(x - 1, y)) || isWater(tileAt(x + 1, y))) c = "bark2";
+      const own = tileAt(x, y);
+      const f = field(land, x, y) + (hash(x >> 1, y >> 1, 31) - 0.5) * 0.14;
+      let c: Col;
+      if (isDeck(own)) c = deckTexel(own, x, y, tileAt);
+      else if (f >= 0.5) {
+        const t = landAt(x, y);
+        c = f < 0.57 ? (EDGE[t] ?? texel(t, x, y)) : texel(t, x, y);
       } else {
-        // a bevel at the water's edge; soft grounds fray into their neighbors
-        let water = false;
-        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) if (isWater(tileAt(x + dx, y + dy))) water = true;
-        if (water) c = EDGE[t] ?? c;
-        else if (SOFT.has(t)) {
-          const lx = x % TL, ly = y % TL;
-          const sides: [number, number, number][] = [[-1, 0, lx], [1, 0, TL - 1 - lx], [0, -1, ly], [0, 1, TL - 1 - ly]];
-          for (const [dx, dy, dist] of sides) {
-            if (dist > 3) continue;
-            const n = tileAt(x + dx * (dist + 1), y + dy * (dist + 1));
-            if (n === t || !SOFT.has(n)) continue;
-            if (hash(x, y, 21) < (4 - dist) / 8) c = texel(n, x, y);
-          }
-        }
+        // water: lighter toward land, a thin foam line at the shore, a deck's shadow
+        const shallow = Math.min(1, field(wide, x, y) * 2.4);
+        const p = 0.65 + shallow * 1.35;
+        const ramp: Col[] = ["jade2", "jade3", "foam1"];
+        const k = Math.floor(p);
+        c = bayer(x, y) < p - k ? ramp[Math.min(2, k + 1)]! : ramp[k]!;
+        if (shallow < 0.3 && y % 7 === 0 && (x + Math.floor(y / 7) * 9) % 13 < 3) c = "foam1"; // still wave streaks
+        if (f >= 0.45) c = bayer(x, y) < 0.7 ? "white" : "foam2";
+        else if (f >= 0.41) put(inner.data, x, y, "white", 230);
+        else if (f >= 0.33 && f < 0.36) put(outer.data, x, y, bayer(x, y) < 0.5 ? "white" : "foam2", 200);
+        const up = tileAt(x, y - 1), up2 = tileAt(x, y - 2), up3 = tileAt(x, y - 3);
+        if (isDeck(up)) c = "jade1";
+        else if (isDeck(up2) || isDeck(up3)) c = bayer(x, y) < 0.6 ? "jade2" : c;
       }
-      const [r, g, b] = rgb(c);
-      const i = (y * Wp + x) * 4;
-      d[i] = r;
-      d[i + 1] = g;
-      d[i + 2] = b;
-      d[i + 3] = 255;
+      put(d, x, y, c);
     }
-  ctx.putImageData(img, 0, 0);
-  return canvas;
+  g.putImageData(img, 0, 0);
+  fi.putImageData(inner, 0, 0);
+  fo.putImageData(outer, 0, 0);
+  return { ground, foamIn, foamOut };
+}
+
+/** A deck or log raft pixel: its texture, a front face and side rims at the water, rope railings
+ *  with posts along every edge that faces open water (not where a bridge or land joins it). */
+function deckTexel(t: Ground, x: number, y: number, tileAt: (x: number, y: number) => Ground): Col {
+  const lx = x % TL, ly = y % TL;
+  const N = tileAt(x, y - ly - 1), S = tileAt(x, y - ly + TL), Wt = tileAt(x - lx - 1, y), E = tileAt(x - lx + TL, y);
+  const water = (n: Ground) => n === "~";
+  // the front face where the raft meets the water below
+  if (water(S) && ly >= 14) return ly === 15 ? "bark1" : "bark2";
+  // posts at the corners of water edges, ropes between them
+  const post = (a: number) => a % 8 === 1 || a % 8 === 2;
+  if (water(N) && ly <= 2) {
+    if (post(lx) && ly <= 2) return ly === 0 ? "sand1" : "bark1";
+    if (ly === 1) return "sand2"; // rope
+  }
+  if (water(S) && ly >= 9 && ly <= 13) {
+    if (post(lx)) return ly === 9 ? "sand1" : "bark1";
+    if (ly === 10) return "sand2";
+  }
+  if (water(Wt) && lx <= 2) {
+    if (post(ly) && lx <= 1) return lx === 0 ? "bark1" : "sand1";
+    if (lx === 1) return "sand2";
+  }
+  if (water(E) && lx >= 13) {
+    if (post(ly) && lx >= 14) return lx === 15 ? "bark1" : "sand1";
+    if (lx === 14) return "sand2";
+  }
+  // a dark rim along sides open to the water
+  if ((water(Wt) && lx === 0) || (water(E) && lx === 15)) return "bark1";
+  return texel(t, x, y);
 }

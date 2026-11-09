@@ -2,11 +2,11 @@
 // spots where you do business. Each village is built from a few shapes (an island blob, paths,
 // raft decks) so the layouts stay easy to read and change.
 //   ground  ~ water · . grass · , flowers · s sand · : dirt path · o stone · = wooden deck
-//           r rock · w salt pan
+//           r rock · w salt pan · # log raft
 // Services only appear when the island's market offers them (balance.jsonc economy.markets).
 // A stall keeper stands on the stall's own row: drawn behind it, shown between awning and counter.
 
-export type Ground = "~" | "." | "," | "s" | ":" | "o" | "=" | "r" | "w";
+export type Ground = "~" | "." | "," | "s" | ":" | "o" | "=" | "r" | "w" | "#";
 export type Facing = "down" | "up" | "left" | "right";
 export type Service = "market" | "shop" | "fuel" | "repair" | "gift" | "talk" | "leave";
 
@@ -139,15 +139,17 @@ function redLighthouse(): VillageDef {
   };
 }
 
-// ── 물장터: rafts and old hulls lashed together on the water ──
+// ── 물장터: separate rafts lashed together by plank bridges ──
 function waterMarket(): VillageDef {
   const g = new Grid(W, H)
-    .fill(9, 5, 31, 18, "=")
-    .fill(14, 12, 16, 14, "~")
-    .fill(25, 13, 27, 14, "~")
-    .fill(3, 9, 8, 14, "=")
-    .fill(32, 8, 37, 12, "=")
-    .fill(19, 19, 20, 25, "=");
+    .fill(13, 5, 27, 12, "=") // the market raft
+    .fill(3, 8, 9, 13, "#") // the boat-repair log raft
+    .fill(31, 6, 36, 11, "#") // the fuel raft
+    .fill(14, 15, 26, 19, "=") // the landing raft
+    .fill(10, 10, 12, 10, "=") // bridges
+    .fill(28, 8, 30, 8, "=")
+    .fill(20, 13, 20, 14, "=")
+    .fill(19, 20, 20, 25, "=");
   return {
     id: "water_market",
     w: W,
@@ -155,39 +157,41 @@ function waterMarket(): VillageDef {
     ground: g.g,
     spawn: [20, 22],
     props: [
-      { sprite: "b_stall_fish", x: 15, y: 9, foot: [3, 1] },
-      { sprite: "b_stall_goods", x: 24, y: 9, foot: [3, 1] },
-      { sprite: "b_shed", x: 5, y: 12, foot: [3, 2] },
-      { sprite: "b_pump", x: 35, y: 10, foot: [1, 1] },
-      { sprite: "o_drum", x: 36, y: 10, foot: [1, 1] },
-      { sprite: "o_drum", x: 34, y: 9, foot: [1, 1] },
-      { sprite: "b_board", x: 11, y: 7, foot: [1, 1] },
-      { sprite: "b_house_brown", x: 28, y: 7, foot: [3, 2] },
-      { sprite: "o_crate", x: 18, y: 8, foot: [1, 1] },
-      { sprite: "o_crate", x: 21, y: 8, foot: [1, 1] },
-      { sprite: "o_barrel", x: 12, y: 10, foot: [1, 1] },
-      { sprite: "o_barrel", x: 29, y: 12, foot: [1, 1] },
-      { sprite: "o_netrack", x: 11, y: 17, foot: [2, 1] },
-      { sprite: "o_netrack", x: 29, y: 17, foot: [2, 1] },
-      { sprite: "o_lamp", x: 18, y: 18, foot: [1, 1], light: true },
-      { sprite: "o_lamp", x: 21, y: 18, foot: [1, 1], light: true },
-      { sprite: "o_lamp", x: 10, y: 14, foot: [1, 1], light: true },
-      { sprite: "o_rowboat", x: 5, y: 18 },
-      { sprite: "o_rowboat", x: 35, y: 16 },
-      { sprite: "o_rowboat", x: 26, y: 22 },
+      { sprite: "b_stall_fish", x: 16, y: 8, foot: [3, 1] },
+      { sprite: "b_stall_goods", x: 24, y: 8, foot: [3, 1] },
+      { sprite: "b_board", x: 14, y: 6, foot: [1, 1] },
+      { sprite: "o_crate", x: 19, y: 6, foot: [1, 1] },
+      { sprite: "o_crate", x: 21, y: 6, foot: [1, 1] },
+      { sprite: "o_barrel", x: 26, y: 11, foot: [1, 1] },
+      { sprite: "o_lamp", x: 14, y: 11, foot: [1, 1], light: true },
+      { sprite: "o_lamp", x: 26, y: 6, foot: [1, 1], light: true },
+      { sprite: "b_shed", x: 6, y: 11, foot: [3, 2] },
+      { sprite: "o_netrack", x: 4, y: 9, foot: [2, 1] },
+      { sprite: "b_pump", x: 34, y: 8, foot: [1, 1] },
+      { sprite: "o_drum", x: 35, y: 8, foot: [1, 1] },
+      { sprite: "o_drum", x: 33, y: 7, foot: [1, 1] },
+      { sprite: "b_house_brown", x: 23, y: 17, foot: [3, 2] },
+      { sprite: "o_netrack", x: 16, y: 17, foot: [2, 1] },
+      { sprite: "o_barrel", x: 25, y: 19, foot: [1, 1] },
+      { sprite: "o_lamp", x: 18, y: 19, foot: [1, 1], light: true },
+      { sprite: "o_lamp", x: 21, y: 19, foot: [1, 1], light: true },
+      { sprite: "o_rowboat", x: 11, y: 15 },
+      { sprite: "o_rowboat", x: 29, y: 14 },
+      { sprite: "o_rowboat", x: 37, y: 16 },
+      { sprite: "o_rowboat", x: 7, y: 18 },
     ],
     npcs: [
-      { id: "malsun", look: "malsun", name: "말순", x: 15, y: 9, dir: "down" },
-      { id: "goods", look: "woman", name: "잡화 좌판", x: 24, y: 9, dir: "down" },
-      { id: "fixer", look: "fisher", name: "배 고치는 아저씨", x: 8, y: 13, dir: "left" },
-      { id: "walker", look: "man", name: "장꾼", x: 12, y: 16, dir: "right", walk: [[12, 16], [23, 16], [23, 11], [23, 16]] },
+      { id: "malsun", look: "malsun", name: "말순", x: 16, y: 8, dir: "down" },
+      { id: "goods", look: "woman", name: "잡화 좌판", x: 24, y: 8, dir: "down" },
+      { id: "fixer", look: "fisher", name: "배 고치는 아저씨", x: 8, y: 12, dir: "left" },
+      { id: "walker", look: "man", name: "장꾼", x: 15, y: 11, dir: "right", walk: [[15, 11], [25, 11]] },
     ],
     pois: [
-      { id: "market", x: 15, y: 10, services: ["market"], who: "말순 · 생선 좌판", npc: "malsun" },
-      { id: "shop", x: 24, y: 10, services: ["shop"], who: "잡화 좌판", npc: "goods" },
-      { id: "repair", x: 5, y: 13, services: ["repair"], who: "배 고치는 아저씨", npc: "fixer" },
-      { id: "fuel", x: 35, y: 11, services: ["fuel"], who: "주유기" },
-      { id: "board", x: 11, y: 8, services: ["talk"], who: "장터 게시판", lines: ["「오늘의 특가는 좌판 앞에 적어 둡니다」", "「한 가지만 잔뜩 가져오면 값이 내려가요」"] },
+      { id: "market", x: 16, y: 9, services: ["market"], who: "말순 · 생선 좌판", npc: "malsun" },
+      { id: "shop", x: 24, y: 9, services: ["shop"], who: "잡화 좌판", npc: "goods" },
+      { id: "repair", x: 6, y: 12, services: ["repair"], who: "배 고치는 아저씨", npc: "fixer" },
+      { id: "fuel", x: 34, y: 9, services: ["fuel"], who: "주유기" },
+      { id: "board", x: 14, y: 7, services: ["talk"], who: "장터 게시판", lines: ["「오늘의 특가는 좌판 앞에 적어 둡니다」", "「한 가지만 잔뜩 가져오면 값이 내려가요」"] },
       { id: "pier", x: 20, y: 24, services: ["leave"], who: "선착장" },
     ],
   };
@@ -249,11 +253,14 @@ function saltFlower(): VillageDef {
 // ── 종탑섬: the bell tower of a drowned school, children living on rafts around it ──
 function bellTower(): VillageDef {
   const g = new Grid(W, H)
-    .fill(10, 6, 30, 18, "=")
-    .fill(10, 6, 12, 8, "~")
-    .fill(28, 16, 30, 18, "~")
-    .fill(17, 13, 18, 14, "~")
-    .fill(19, 19, 20, 25, "=");
+    .fill(15, 5, 25, 12, "=") // the ring raft round the tower
+    .fill(6, 8, 12, 14, "#") // west log raft: the fish stall
+    .fill(28, 8, 34, 14, "#") // east log raft: the children's stall
+    .fill(14, 15, 26, 19, "=") // the landing raft: the carpenter
+    .fill(13, 11, 14, 11, "=") // bridges
+    .fill(26, 11, 27, 11, "=")
+    .fill(20, 13, 20, 14, "=")
+    .fill(19, 20, 20, 25, "=");
   return {
     id: "bell_tower",
     w: W,
@@ -261,33 +268,35 @@ function bellTower(): VillageDef {
     ground: g.g,
     spawn: [20, 22],
     props: [
-      { sprite: "b_belltower", x: 20, y: 10, foot: [3, 3] },
-      { sprite: "b_stall_fish", x: 14, y: 11, foot: [3, 1] },
-      { sprite: "b_stall_goods", x: 26, y: 11, foot: [3, 1] },
-      { sprite: "b_shed", x: 13, y: 17, foot: [3, 2] },
-      { sprite: "b_board", x: 23, y: 15, foot: [1, 1] },
-      { sprite: "o_crate", x: 24, y: 7, foot: [1, 1] },
-      { sprite: "o_crate", x: 25, y: 7, foot: [1, 1] },
-      { sprite: "o_barrel", x: 16, y: 7, foot: [1, 1] },
-      { sprite: "o_netrack", x: 27, y: 14, foot: [2, 1] },
-      { sprite: "o_flowers", x: 22, y: 12 },
-      { sprite: "o_lamp", x: 18, y: 18, foot: [1, 1], light: true },
-      { sprite: "o_lamp", x: 21, y: 18, foot: [1, 1], light: true },
-      { sprite: "o_rowboat", x: 7, y: 15 },
-      { sprite: "o_rowboat", x: 33, y: 9 },
+      { sprite: "b_belltower", x: 20, y: 9, foot: [3, 3] },
+      { sprite: "o_crate", x: 16, y: 6, foot: [1, 1] },
+      { sprite: "o_crate", x: 17, y: 6, foot: [1, 1] },
+      { sprite: "o_barrel", x: 24, y: 6, foot: [1, 1] },
+      { sprite: "o_flowers", x: 22, y: 11 },
+      { sprite: "b_stall_fish", x: 9, y: 11, foot: [3, 1] },
+      { sprite: "b_stall_goods", x: 31, y: 11, foot: [3, 1] },
+      { sprite: "b_shed", x: 16, y: 17, foot: [3, 2] },
+      { sprite: "b_board", x: 23, y: 16, foot: [1, 1] },
+      { sprite: "o_netrack", x: 25, y: 18, foot: [2, 1] },
+      { sprite: "o_lamp", x: 18, y: 19, foot: [1, 1], light: true },
+      { sprite: "o_lamp", x: 21, y: 19, foot: [1, 1], light: true },
+      { sprite: "o_lamp", x: 15, y: 11, foot: [1, 1], light: true },
+      { sprite: "o_rowboat", x: 4, y: 17 },
+      { sprite: "o_rowboat", x: 36, y: 5 },
+      { sprite: "o_rowboat", x: 11, y: 21 },
     ],
     npcs: [
-      { id: "bada", look: "kid", name: "아이 바다", x: 14, y: 11, dir: "down" },
-      { id: "kid2", look: "kid", name: "좌판 아이", x: 26, y: 11, dir: "down" },
-      { id: "fixer", look: "man", name: "목수 아저씨", x: 16, y: 18, dir: "left" },
-      { id: "walker", look: "kid", name: "뛰노는 아이", x: 12, y: 15, dir: "right", walk: [[12, 15], [25, 15]] },
+      { id: "bada", look: "kid", name: "아이 바다", x: 9, y: 11, dir: "down" },
+      { id: "kid2", look: "kid", name: "좌판 아이", x: 31, y: 11, dir: "down" },
+      { id: "fixer", look: "man", name: "목수 아저씨", x: 18, y: 18, dir: "left" },
+      { id: "walker", look: "kid", name: "뛰노는 아이", x: 19, y: 16, dir: "right", walk: [[19, 16], [22, 16]] },
     ],
     pois: [
-      { id: "market", x: 14, y: 12, services: ["market"], who: "아이 바다 · 생선 좌판", npc: "bada" },
-      { id: "shop", x: 26, y: 12, services: ["shop"], who: "아이들의 좌판", npc: "kid2" },
-      { id: "repair", x: 13, y: 18, services: ["repair"], who: "목수 아저씨", npc: "fixer" },
-      { id: "tower", x: 20, y: 11, services: ["talk"], who: "종탑", lines: ["물에 잠긴 학교의 종탑. 오래된 교과서 냄새가 난다.", "아이들이 이 종을 쳐서 시간을 알린다."] },
-      { id: "board", x: 23, y: 16, services: ["talk"], who: "게시판", lines: ["「선체 Lv2는 이 섬에서 팔아요 — 청빛 바다로 가려면 꼭!」"] },
+      { id: "market", x: 9, y: 12, services: ["market"], who: "아이 바다 · 생선 좌판", npc: "bada" },
+      { id: "shop", x: 31, y: 12, services: ["shop"], who: "아이들의 좌판", npc: "kid2" },
+      { id: "repair", x: 16, y: 18, services: ["repair"], who: "목수 아저씨", npc: "fixer" },
+      { id: "tower", x: 20, y: 10, services: ["talk"], who: "종탑", lines: ["물에 잠긴 학교의 종탑. 오래된 교과서 냄새가 난다.", "아이들이 이 종을 쳐서 시간을 알린다."] },
+      { id: "board", x: 23, y: 17, services: ["talk"], who: "게시판", lines: ["「선체 Lv2는 이 섬에서 팔아요 — 청빛 바다로 가려면 꼭!」"] },
       { id: "pier", x: 20, y: 24, services: ["leave"], who: "선착장" },
     ],
   };
