@@ -20,7 +20,10 @@ const SPEED = 70; // px/s
 const NPC_SPEED = 28;
 const PROMPT_BTN = { x: 320 - 140, y: 318, w: 280, h: 20 };
 
-type Walker = { def: Npc; x: number; y: number; dir: Facing; wp: number; wait: number; moving: boolean; t: number };
+type Walker = { def: Npc; x: number; y: number; dir: Facing; wp: number; wait: number; moving: boolean; t: number; lookT: number; hop: number };
+type Puff = { x: number; y: number; vx: number; t: number; life: number };
+/** A gull: sitting on its perch, or flying (z = height) — circling, or coming back to land. */
+type Gull = { x: number; y: number; z: number; perch: [number, number] | null; mode: "sit" | "circle" | "land"; a: number; r: number; speed: number; back: number; flip: boolean };
 type Sub = { k: "market"; p: MarketPanel } | { k: "shop"; p: ShopPanel } | { k: "bag"; p: InventoryPanel };
 
 const SERVICE_LABEL: Record<Service, string> = {
@@ -58,6 +61,10 @@ export class VillageScene implements Scene {
   readonly fx = new Fx();
   private readonly trader: Trader;
   private cam = { x: 0, y: 0 };
+  private puffs: Puff[] = [];
+  private smokeT = 0;
+  private gulls: Gull[] = [];
+  private gullCenter: [number, number] = [0, 0];
 
   constructor(
     private readonly game: Game,
@@ -68,8 +75,17 @@ export class VillageScene implements Scene {
     this.pc = { x: sx, y: sy, dir: "up", moving: false, t: 0 };
     this.walkers = this.def.npcs.map((n) => {
       const [x, y] = feetAt(n.x, n.y);
-      return { def: n, x, y, dir: n.dir, wp: 0, wait: 0, moving: false, t: 0 };
+      return { def: n, x, y, dir: n.dir, wp: 0, wait: 0, moving: false, t: 0, lookT: 2 + (n.x % 4), hop: 0 };
     });
+    const center: [number, number] = [(this.def.w * TL) / 2, (this.def.h * TL) / 2];
+    this.gullCenter = center;
+    this.gulls = [
+      ...(this.def.perches ?? []).map(([px, py], i): Gull => {
+        const [x, y] = feetAt(px, py);
+        return { x, y: y - 2, z: 0, perch: [x, y - 2], mode: "sit", a: i * 1.7, r: 150 + i * 20, speed: 0.22 + (i % 3) * 0.05, back: 0, flip: i % 2 === 0 };
+      }),
+      ...Array.from({ length: this.def.gulls ?? 0 }, (_, i): Gull => ({ x: center[0], y: center[1], z: 30 + i * 6, perch: null, mode: "circle", a: i * 2.1, r: 170 + i * 26, speed: 0.18 + i * 0.04, back: 0, flip: false })),
+    ];
     this.trader = new Trader(game, islandId, this.fx, (s, bad) => this.say(s, 2.5, bad ? lutHex("coral") : undefined), () => (this.sub ? [BIG.x + BIG.w - 50, BIG.y + 26] : [60, 34]));
     const m = this.market;
     this.pois = this.def.pois.filter((p) => p.services.some((s) => this.offers(s, m)));
@@ -281,6 +297,7 @@ export class VillageScene implements Scene {
     if (this.bubble && this.t > this.bubble.until) this.bubble = null;
     if (engine.dev) this.devKeys(engine);
     this.stepWalkers(dt);
+    this.stepAmbient(dt);
     if (this.sub) {
       this.sub.p.update(engine);
       if (this.sub.p.closed) {
@@ -363,6 +380,7 @@ export class VillageScene implements Scene {
         if (w && Math.hypot(w.x - this.pc.x, w.y - this.pc.y) < 3 * TL) {
           this.greeted.add(p.npc);
           this.bubble = { npc: p.npc, text: m.line, until: this.t + 4.5 };
+          w.hop = 0.6;
         }
       }
     }
@@ -396,8 +414,18 @@ export class VillageScene implements Scene {
   private stepWalkers(dt: number): void {
     for (const w of this.walkers) {
       w.t += dt;
+      w.hop = Math.max(0, w.hop - dt);
       const path = w.def.walk;
-      if (!path || path.length < 2) continue;
+      if (!path || path.length < 2) {
+        // people who stay put look about now and then, and turn to you when you come close
+        if (Math.hypot(w.x - this.pc.x, w.y - this.pc.y) < 2.4 * TL) w.dir = faceToward(w.x, w.y, this.pc.x, this.pc.y);
+        else if ((w.lookT -= dt) <= 0) {
+          const looking = w.dir !== w.def.dir;
+          w.dir = looking ? w.def.dir : (["left", "right", "down"] as Facing[])[Math.floor((w.t * 7) % 3)]!;
+          w.lookT = looking ? 3 + ((w.t * 13) % 4) : 1.2;
+        }
+        continue;
+      }
       if (w.wait > 0) {
         w.wait -= dt;
         w.moving = false;
@@ -521,18 +549,21 @@ export class VillageScene implements Scene {
       if (!assets.has("town", name)) continue;
       const f = assets.frame("town", name);
       const [cx, bottom] = anchorOf(p);
-      list.push({ y: bottom, draw: () => assets.draw(ctx, "town", name, Math.round(cx - f.w / 2 - cam.x), Math.round(bottom - f.h - cam.y)) });
+      const bob = p.sprite === "o_rowboat" ? Math.round(Math.sin(this.t * 1.4 + p.x * 0.7)) : 0;
+      list.push({ y: bottom, draw: () => assets.draw(ctx, "town", name, Math.round(cx - f.w / 2 - cam.x), Math.round(bottom - f.h - cam.y) + bob) });
     }
     for (const w of this.walkers) {
       // a keeper behind a counter stands on a crate, so even the children show over it
       const [tx, ty] = tileOf(w.x, w.y);
       const lift = this.solid[ty * this.def.w + tx] ? 4 : 0;
-      list.push({ y: w.y, draw: () => this.drawPerson(ctx, w.def.look, w.x, w.y - lift, w.dir, w.moving ? w.t : 0, cam) });
+      const hop = w.hop > 0 ? Math.round(Math.abs(Math.sin((w.hop / 0.3) * Math.PI)) * 3) : 0;
+      list.push({ y: w.y, draw: () => this.drawPerson(ctx, w.def.look, w.x, w.y - lift - hop, w.dir, w.moving ? w.t : 0, cam) });
     }
     list.push({ y: this.pc.y, draw: () => this.drawPerson(ctx, "pc", this.pc.x, this.pc.y, this.pc.dir, this.pc.moving ? this.pc.t : 0, cam) });
     list.sort((a, b) => a.y - b.y);
     for (const d of list) d.draw();
 
+    this.drawAmbient(ctx, cam);
     this.drawMarkers(ctx, cam);
     drawDayTint(ctx, this.game.clock);
     if (isNight(this.game.clock)) this.drawLights(ctx, cam);
@@ -566,6 +597,90 @@ export class VillageScene implements Scene {
     ctx.fillRect(Math.round(x - 4 - cam.x), Math.round(y - 3 - cam.y), 8, 1);
     ctx.globalAlpha = 1;
     this.engine.assets.draw(ctx, "town", `p_${look}_${dir}_${frame}`, Math.round(x - 8 - cam.x), Math.round(y - 22 - cam.y));
+  }
+
+  /** Chimney smoke and the gulls. */
+  private stepAmbient(dt: number): void {
+    const assets = this.engine?.assets;
+    // a puff from every chimney now and then
+    this.smokeT += dt;
+    if (assets && this.smokeT > 0.5) {
+      this.smokeT = 0;
+      for (const p of this.def.props) {
+        if (!p.sprite.startsWith("b_house_") || !assets.has("town", p.sprite)) continue;
+        const f = assets.frame("town", p.sprite);
+        const [cx, bottom] = anchorOf(p);
+        this.puffs.push({ x: cx - f.w / 2 + f.w - 12 + (Math.random() - 0.5) * 2, y: bottom - f.h + 3, vx: 3 + Math.random() * 4, t: 0, life: 2.6 });
+      }
+    }
+    for (const q of this.puffs) {
+      q.t += dt;
+      q.x += q.vx * dt;
+      q.y -= 9 * dt;
+    }
+    this.puffs = this.puffs.filter((q) => q.t < q.life);
+
+    // gulls: sit until you come close, circle a while, come back when you've gone
+    const [cx, cy] = this.gullCenter;
+    for (const g of this.gulls) {
+      if (g.mode === "sit") {
+        if (Math.hypot(g.x - this.pc.x, g.y - this.pc.y) < 2.6 * TL) {
+          g.mode = "circle";
+          g.a = Math.atan2(g.y - cy, g.x - cx);
+          g.back = 12 + Math.random() * 8;
+        }
+        continue;
+      }
+      if (g.mode === "circle") {
+        g.a += g.speed * dt;
+        const tx = cx + Math.cos(g.a) * g.r, ty = cy + Math.sin(g.a) * g.r * 0.6;
+        g.x += (tx - g.x) * Math.min(1, dt * 1.5);
+        g.y += (ty - g.y) * Math.min(1, dt * 1.5);
+        g.z += (34 - g.z) * Math.min(1, dt * 2);
+        g.flip = Math.cos(g.a) < 0;
+        if (g.perch && (g.back -= dt) <= 0 && Math.hypot(g.perch[0] - this.pc.x, g.perch[1] - this.pc.y) > 4 * TL) g.mode = "land";
+        continue;
+      }
+      // coming in to land
+      const [px, py] = g.perch!;
+      g.x += (px - g.x) * Math.min(1, dt * 1.6);
+      g.y += (py - g.y) * Math.min(1, dt * 1.6);
+      g.z = Math.max(0, g.z - 26 * dt);
+      if (g.z === 0 && Math.hypot(px - g.x, py - g.y) < 1) Object.assign(g, { x: px, y: py, mode: "sit" });
+    }
+  }
+
+  /** Smoke, butterflies over the flowers, the gulls and their shadows. */
+  private drawAmbient(ctx: CanvasRenderingContext2D, cam: { x: number; y: number }): void {
+    for (const q of this.puffs) {
+      const k = q.t / q.life, r = 1.5 + k * 2.5;
+      ctx.globalAlpha = 0.5 * (1 - k);
+      ctx.fillStyle = lutHex(k < 0.4 ? "gray2" : "white");
+      ctx.fillRect(Math.round(q.x - r - cam.x), Math.round(q.y - r - cam.y), Math.round(r * 2), Math.round(r * 2));
+    }
+    ctx.globalAlpha = 1;
+    // butterflies
+    let i = 0;
+    for (const p of this.def.props) {
+      if (p.sprite !== "o_flowers") continue;
+      const [cx, bottom] = anchorOf(p);
+      const x = Math.round(cx + Math.sin(this.t * 1.1 + i * 2) * 12 - cam.x), y = Math.round(bottom - 12 + Math.sin(this.t * 2.3 + i) * 5 - cam.y);
+      ctx.fillStyle = lutHex((["coral", "yellow", "white"] as const)[i % 3]);
+      if (Math.floor(this.t * 8 + i) % 2) ctx.fillRect(x - 1, y, 3, 1);
+      else ctx.fillRect(x, y, 1, 1);
+      i++;
+    }
+    // gulls
+    for (const g of this.gulls) {
+      const x = Math.round(g.x - cam.x), y = Math.round(g.y - cam.y);
+      if (g.z > 1) {
+        ctx.globalAlpha = 0.18;
+        ctx.fillStyle = lutHex("ink");
+        ctx.fillRect(x - 3, y, 7, 2);
+        ctx.globalAlpha = 1;
+        drawGull(ctx, x, Math.round(y - g.z), Math.floor(this.t * 7 + g.a) % 2 === 0, g.flip);
+      } else drawPerched(ctx, x, y, g.flip);
+    }
   }
 
   /** Every building, tree and prop casts a soft shadow, leaning back and to the right (the
@@ -659,7 +774,7 @@ export class VillageScene implements Scene {
         if (d < bd) (bd = d), (who = w);
       }
     }
-    if (who && this.bubble?.npc !== who.def.id) text(ctx, who.def.name, who.x - cam.x, who.y - 40 - cam.y, { align: "center", color: lutHex("white") });
+    if (who && this.bubble?.npc !== who.def.id) text(ctx, who.def.name, who.x - cam.x, who.y - 36 - cam.y, { align: "center", color: lutHex("white") });
     if (this.bubble) {
       const w = this.walkers.find((x) => x.def.id === this.bubble!.npc);
       if (w) {
@@ -706,6 +821,33 @@ function anchorOf(p: Prop): [number, number] {
   const w = p.foot?.[0] ?? 1;
   const x0 = p.x - Math.floor(w / 2);
   return [(x0 + w / 2) * TL, (p.y + 1) * TL];
+}
+
+const GULL_UP = ["w.......w", "ww.....ww", ".wwwgwww.", "....g...."];
+const GULL_DOWN = [".........", "wwwwgwwww", "..w.g.w..", "....y...."];
+const GULL_SIT = [".ww..", "wwwwy", ".ggw.", "..k.."];
+
+function pixels(ctx: CanvasRenderingContext2D, rows: string[], x: number, y: number, flip: boolean): void {
+  const colors: Record<string, string> = { w: lutHex("white"), g: lutHex("gray2"), y: lutHex("yellow"), k: lutHex("ink") };
+  const w = rows[0]!.length;
+  // a dark edge underneath so a white bird reads on pale water
+  ctx.fillStyle = lutHex("ink");
+  rows.forEach((r, j) => [...r].forEach((ch, i) => ch !== "." && ch !== "k" && ctx.fillRect(x + (flip ? w - 1 - i : i), y + j + 1, 1, 1)));
+  rows.forEach((r, j) =>
+    [...r].forEach((ch, i) => {
+      if (ch === ".") return;
+      ctx.fillStyle = colors[ch]!;
+      ctx.fillRect(x + (flip ? w - 1 - i : i), y + j, 1, 1);
+    }),
+  );
+}
+
+function drawGull(ctx: CanvasRenderingContext2D, x: number, y: number, up: boolean, flip: boolean): void {
+  pixels(ctx, up ? GULL_UP : GULL_DOWN, x - 4, y - 2, flip);
+}
+
+function drawPerched(ctx: CanvasRenderingContext2D, x: number, y: number, flip: boolean): void {
+  pixels(ctx, GULL_SIT, x - 2, y - 4, flip);
 }
 
 function faceToward(x: number, y: number, tx: number, ty: number): Facing {

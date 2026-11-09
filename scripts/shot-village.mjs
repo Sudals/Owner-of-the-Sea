@@ -32,6 +32,13 @@ for (const id of ["red_lighthouse", "water_market", "salt_flower", "bell_tower"]
   await until(() => window.__sea.engine.currentScene.state.k === "village");
   await page.waitForTimeout(400);
   await shot(`village-${id}`);
+  // every spot can be walked to from the pier (a prop must never block a bridge or a door)
+  const stuck = await page.evaluate(() => {
+    const s = window.__sea.engine.currentScene;
+    return s.pois.filter((p) => s.findRoute(p.x, p.y) === null).map((p) => p.id);
+  });
+  if (stuck.length) errors.push(`${id}: can't walk to ${stuck.join(", ")}`);
+  else console.log(`${id}: all ${await page.evaluate(() => window.__sea.engine.currentScene.pois.length)} spots reachable`);
   // walk up the path a little so the camera shows the middle of the village
   await page.keyboard.down("ArrowUp");
   await page.waitForTimeout(900);

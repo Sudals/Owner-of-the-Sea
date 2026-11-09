@@ -27,6 +27,9 @@ export type VillageDef = {
   pois: Poi[];
   /** Where you step off the boat (facing up, into the village). */
   spawn: [number, number];
+  /** Tiles where gulls sit (they fly off when you come close), and how many circle overhead. */
+  perches?: [number, number][];
+  gulls?: number;
 };
 
 const hash = (x: number, y: number, s: number) => {
@@ -103,7 +106,7 @@ function redLighthouse(): VillageDef {
     props: [
       { sprite: "b_lighthouse", x: 10, y: 7, foot: [2, 2] },
       { sprite: "b_house_red", x: 16, y: 10, foot: [3, 2] },
-      { sprite: "b_house_blue", x: 24, y: 10, foot: [3, 2] },
+      { sprite: "b_grandpa", x: 24, y: 10, foot: [3, 2] },
       { sprite: "b_shed", x: 29, y: 16, foot: [3, 2] },
       { sprite: "b_board", x: 15, y: 15, foot: [1, 1] },
       { sprite: "o_tree", x: 8, y: 12, foot: [1, 1] },
@@ -122,7 +125,17 @@ function redLighthouse(): VillageDef {
       { sprite: "o_barrel", x: 32, y: 17, foot: [1, 1] },
       { sprite: "o_netrack", x: 25, y: 19, foot: [2, 1] },
       { sprite: "o_rowboat", x: 23, y: 23 },
+      // 할멈's garden and laundry, a well and a bench on the way down, fish drying by the shed
+      { sprite: "o_garden", x: 10, y: 10, foot: [2, 1] },
+      { sprite: "o_fence", x: 9, y: 11, foot: [1, 1] },
+      { sprite: "o_fence", x: 10, y: 11, foot: [1, 1] },
+      { sprite: "o_laundry", x: 20, y: 8, foot: [2, 1] },
+      { sprite: "o_well", x: 21, y: 15, foot: [1, 1] },
+      { sprite: "o_bench", x: 17, y: 14, foot: [1, 1] },
+      { sprite: "o_fishrack", x: 32, y: 15, foot: [2, 1] },
     ],
+    perches: [[6, 9], [34, 15], [33, 7]],
+    gulls: 3,
     npcs: [
       { id: "granny", look: "granny", name: "덕배 할멈", x: 18, y: 11, dir: "down" },
       { id: "fixer", look: "fisher", name: "동네 아저씨", x: 30, y: 18, dir: "left" },
@@ -179,12 +192,20 @@ function waterMarket(): VillageDef {
       { sprite: "o_rowboat", x: 29, y: 14 },
       { sprite: "o_rowboat", x: 37, y: 16 },
       { sprite: "o_rowboat", x: 7, y: 18 },
+      // fish drying, sacks of goods, rods by the repair raft, laundry by the house
+      { sprite: "o_fishrack", x: 22, y: 11, foot: [2, 1] },
+      { sprite: "o_sacks", x: 27, y: 7, foot: [1, 1] },
+      { sprite: "o_rods", x: 8, y: 9, foot: [1, 1] },
+      { sprite: "o_laundry", x: 15, y: 15, foot: [2, 1] },
+      { sprite: "o_pot", x: 26, y: 15, foot: [1, 1] },
     ],
+    perches: [[27, 5], [36, 11], [3, 13], [14, 19]],
+    gulls: 4,
     npcs: [
       { id: "malsun", look: "malsun", name: "말순", x: 16, y: 8, dir: "down" },
       { id: "goods", look: "woman", name: "잡화 좌판", x: 24, y: 8, dir: "down" },
       { id: "fixer", look: "fisher", name: "배 고치는 아저씨", x: 8, y: 12, dir: "left" },
-      { id: "walker", look: "man", name: "장꾼", x: 15, y: 11, dir: "right", walk: [[15, 11], [25, 11]] },
+      { id: "walker", look: "man", name: "장꾼", x: 15, y: 10, dir: "right", walk: [[15, 10], [25, 10]] },
     ],
     pois: [
       { id: "market", x: 16, y: 9, services: ["market"], who: "말순 · 생선 좌판", npc: "malsun" },
@@ -233,7 +254,21 @@ function saltFlower(): VillageDef {
       { sprite: "o_lamp", x: 19, y: 20, foot: [1, 1], light: true },
       { sprite: "o_lamp", x: 23, y: 17, foot: [1, 1], light: true },
       { sprite: "o_rowboat", x: 16, y: 23 },
+      // 강노인's salt store with its cart and sacks, a fenced garden, laundry, a well, a bench
+      { sprite: "b_saltstore", x: 24, y: 6, foot: [3, 2] },
+      { sprite: "o_cart", x: 19, y: 10, foot: [2, 1] },
+      { sprite: "o_sacks", x: 16, y: 14, foot: [1, 1] },
+      { sprite: "o_garden", x: 12, y: 17, foot: [2, 1] },
+      { sprite: "o_fence", x: 11, y: 18, foot: [1, 1] },
+      { sprite: "o_fence", x: 12, y: 18, foot: [1, 1] },
+      { sprite: "o_laundry", x: 9, y: 19, foot: [2, 1] },
+      { sprite: "o_well", x: 26, y: 16, foot: [1, 1] },
+      { sprite: "o_bench", x: 20, y: 16, foot: [1, 1] },
+      { sprite: "o_flowers", x: 18, y: 13 },
+      { sprite: "o_flowers", x: 23, y: 12 },
     ],
+    perches: [[8, 8], [34, 12], [13, 21]],
+    gulls: 3,
     npcs: [
       { id: "oldman", look: "oldman", name: "강노인", x: 26, y: 10, dir: "down" },
       { id: "fixer", look: "man", name: "수리공", x: 34, y: 17, dir: "left" },
@@ -242,6 +277,7 @@ function saltFlower(): VillageDef {
     pois: [
       { id: "market", x: 26, y: 11, services: ["market"], who: "강노인 · 생선 매입", npc: "oldman" },
       { id: "shop", x: 14, y: 15, services: ["shop"], who: "소금 가게" },
+      { id: "store", x: 24, y: 7, services: ["talk"], who: "소금 창고", lines: ["강노인의 소금 창고. 올해 소금이 잘 말랐다.", "「소금에 절이면 신선도가 거기서 멈춘다」"] },
       { id: "repair", x: 32, y: 18, services: ["repair"], who: "수리공", npc: "fixer" },
       { id: "fuel", x: 24, y: 21, services: ["fuel"], who: "주유기" },
       { id: "board", x: 18, y: 17, services: ["talk"], who: "게시판", lines: ["「소금에 절인 생선은 이 섬에서 제값」", "「얼음 창고는 소금 가게에서」"] },
@@ -280,11 +316,21 @@ function bellTower(): VillageDef {
       { sprite: "o_netrack", x: 25, y: 18, foot: [2, 1] },
       { sprite: "o_lamp", x: 18, y: 19, foot: [1, 1], light: true },
       { sprite: "o_lamp", x: 21, y: 19, foot: [1, 1], light: true },
-      { sprite: "o_lamp", x: 15, y: 11, foot: [1, 1], light: true },
+      { sprite: "o_lamp", x: 16, y: 12, foot: [1, 1], light: true },
       { sprite: "o_rowboat", x: 4, y: 17 },
       { sprite: "o_rowboat", x: 36, y: 5 },
       { sprite: "o_rowboat", x: 11, y: 21 },
+      // the children's laundry and toys, rods, pots, fish drying
+      { sprite: "o_laundry", x: 24, y: 10, foot: [2, 1] },
+      { sprite: "o_ball", x: 21, y: 17 },
+      { sprite: "o_rods", x: 11, y: 9, foot: [1, 1] },
+      { sprite: "o_pot", x: 7, y: 9, foot: [1, 1] },
+      { sprite: "o_pot", x: 33, y: 9, foot: [1, 1] },
+      { sprite: "o_fishrack", x: 33, y: 13, foot: [2, 1] },
+      { sprite: "o_bench", x: 18, y: 11, foot: [1, 1] },
     ],
+    perches: [[6, 14], [34, 14], [25, 5], [14, 19]],
+    gulls: 4,
     npcs: [
       { id: "bada", look: "kid", name: "아이 바다", x: 9, y: 11, dir: "down" },
       { id: "kid2", look: "kid", name: "좌판 아이", x: 31, y: 11, dir: "down" },

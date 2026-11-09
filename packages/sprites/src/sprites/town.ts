@@ -270,7 +270,18 @@ export const PEOPLE: Record<string, Look> = {
 
 // ── buildings (3/4 view: roof on top, front wall with the door below) ───────────────
 
-type HouseOpts = { w: number; roofH: number; wallH: number; roof: [number, number]; wall: [number, number]; door?: number; windows?: number };
+type HouseOpts = { w: number; roofH: number; wallH: number; roof: [number, number]; wall: [number, number]; door?: number; windows?: number; chimney?: boolean };
+
+/** A brick chimney on the roof's right side; the game puffs smoke from its top (sprite w − 11, 3). */
+function chimney(img: Img): void {
+  const x = img.w - 15;
+  rect(img, x - 1, 4, 8, 10, C.ink);
+  rect(img, x, 5, 6, 9, C.red2);
+  for (let y = 6; y < 13; y += 2) hline(img, x, x + 5, y, C.red1);
+  for (let y = 5; y < 13; y += 2) img.set(x + 2 + ((y >> 1) % 2) * 2, y, C.red1);
+  rect(img, x - 1, 3, 8, 2, C.gray1);
+  hline(img, x - 1, x + 6, 3, C.gray2);
+}
 
 function house(o: HouseOpts): Img {
   const W = o.w + 4, H = o.roofH + o.wallH + 2;
@@ -308,6 +319,186 @@ function house(o: HouseOpts): Img {
   hline(img, 6, W - 7, 1, C.ink);
   hline(img, 0, W - 1, o.roofH + 1, r1);
   hline(img, 0, W - 1, o.roofH + 2, C.ink); // the eave's shadow line on the wall
+  if (o.chimney) chimney(img);
+  return ol(img);
+}
+
+/** Grandfather's house: shuttered, the door boarded up, the roof mended with odd shingles. */
+function grandpaHouse(): Img {
+  const img = house({ w: 40, roofH: 20, wallH: 22, roof: [C.sea1, C.deep2], wall: [C.sand2, C.sand1], windows: 2 });
+  for (const [x, y] of [[10, 8], [26, 6], [17, 13], [31, 12]] as const) rect(img, x, y, 4, 3, C.wood); // mended roof
+  for (const wx of [6, 33]) {
+    rect(img, wx, 26, 7, 6, C.bark2); // shutters
+    vline(img, wx + 3, 26, 31, C.bark1);
+  }
+  const dx = 18, dy = 31; // boards across the door
+  line(img, dx - 1, dy, dx + 8, dy + 8, C.wood);
+  line(img, dx - 1, dy + 8, dx + 8, dy, C.wood);
+  for (const [x, y] of [[dx - 1, dy], [dx + 8, dy], [dx - 1, dy + 8], [dx + 8, dy + 8]] as const) img.set(x, y, C.gray1);
+  for (let x = 3; x < 42; x++) if ((x * 5) % 7 < 3) img.set(x, 42, C.green1); // moss
+  return img;
+}
+
+/** The salt storehouse: a white barn with a wide braced door, salt spilling out. */
+function saltStore(): Img {
+  const W = 58, H = 50;
+  const img = new Img(W, H);
+  rect(img, 4, 22, 50, 25, C.white);
+  vline(img, 4, 22, 46, C.gray2);
+  vline(img, 53, 22, 46, C.gray2);
+  for (let y = 24; y < 46; y += 4) hline(img, 5, 52, y, C.foam2);
+  hline(img, 4, 53, 46, C.gray1);
+  rect(img, 20, 28, 18, 18, C.bark2);
+  rect(img, 21, 29, 16, 17, C.wood);
+  line(img, 21, 29, 36, 45, C.bark2);
+  line(img, 21, 45, 36, 29, C.bark2);
+  vline(img, 28, 29, 45, C.bark1);
+  polygon(img, [[0, 24], [29, 2], [57, 24]], (x, y) => ((y - 2) % 4 === 3 ? C.gray1 : C.gray2));
+  hline(img, 0, 57, 24, C.gray1);
+  hline(img, 1, 56, 25, C.ink);
+  disc(img, 29, 15, 3, C.navy);
+  disc(img, 29, 15, 2, C.foam1);
+  polygon(img, [[8, 47], [14, 41], [19, 47]], (x) => (x < 14 ? C.white : C.foam2));
+  ellipse(img, 44, 43, 4, 3, C.sand2);
+  hline(img, 42, 46, 41, C.bark2);
+  return ol(img);
+}
+
+function laundry(): Img {
+  const img = new Img(36, 24);
+  vline(img, 2, 3, 22, C.bark1);
+  vline(img, 33, 3, 22, C.bark1);
+  for (let x = 3; x < 33; x++) img.set(x, 4 + Math.round(Math.sin(((x - 2) / 31) * Math.PI) * 2), C.gray2);
+  const cloth: [number, number, number, number, number][] = [[6, 5, 6, 8, C.coral], [14, 6, 5, 9, C.white], [21, 6, 7, 7, C.sea2], [29, 5, 3, 6, C.yellow]];
+  for (const [x, y, w, h, c] of cloth) {
+    rect(img, x, y, w, h, c);
+    hline(img, x, x + w - 1, y + h - 1, c === C.white ? C.gray2 : C.ink);
+    img.set(x + 1, y, C.bark2);
+    img.set(x + w - 2, y, C.bark2);
+  }
+  return ol(img);
+}
+
+function fence(): Img {
+  const img = new Img(18, 12);
+  for (const x of [1, 16]) {
+    vline(img, x, 1, 10, C.bark1);
+    img.set(x, 0, C.wood);
+  }
+  hline(img, 1, 16, 3, C.wood);
+  hline(img, 1, 16, 7, C.wood);
+  hline(img, 1, 16, 4, C.bark2);
+  hline(img, 1, 16, 8, C.bark2);
+  return ol(img);
+}
+
+function garden(): Img {
+  const img = new Img(34, 20);
+  rect(img, 1, 2, 32, 16, C.bark2);
+  for (let y = 3; y < 17; y += 4) {
+    hline(img, 1, 32, y, C.wood);
+    for (let x = 3; x < 31; x += 5) {
+      if ((x + y) % 2) {
+        disc(img, x, y + 1, 1.6, C.green2);
+        img.set(x, y, C.green3);
+      } else {
+        vline(img, x, y, y + 1, C.green2);
+        img.set(x - 1, y, C.green3);
+        img.set(x + 1, y, C.green3);
+      }
+    }
+  }
+  return img;
+}
+
+function well(): Img {
+  const img = new Img(22, 26);
+  vline(img, 3, 3, 16, C.bark1);
+  vline(img, 18, 3, 16, C.bark1);
+  polygon(img, [[0, 6], [11, 0], [21, 6]], C.red1);
+  hline(img, 0, 21, 6, C.red2);
+  vline(img, 11, 7, 12, C.gray1);
+  rect(img, 9, 12, 5, 4, C.wood);
+  ellipse(img, 11, 19, 9, 5, (x, y, nx, ny) => (Math.hypot(nx, ny) < 0.6 ? C.deep2 : ny < 0 ? C.gray2 : C.gray1));
+  ellipse(img, 11, 18, 5, 2, C.deep1);
+  for (const x of [4, 8, 13, 17]) img.set(x, 22, C.gray1);
+  return ol(img);
+}
+
+function bench(): Img {
+  const img = new Img(22, 12);
+  rect(img, 1, 3, 20, 3, C.wood);
+  hline(img, 1, 20, 3, C.sand1);
+  hline(img, 1, 20, 6, C.bark2);
+  for (const x of [3, 18]) vline(img, x, 7, 10, C.bark1);
+  return ol(img);
+}
+
+function sacks(): Img {
+  const img = new Img(20, 14);
+  for (const [cx, cy, c] of [[6, 8, C.sand2], [14, 8, C.sand1], [10, 5, C.sand2]] as const) {
+    ellipse(img, cx, cy, 4.5, 3.5, (x, y, nx, ny) => (ny < -0.3 ? C.white : c));
+    img.set(cx, cy - 3, C.bark2);
+  }
+  return ol(img);
+}
+
+function fishRack(): Img {
+  const img = new Img(28, 22);
+  vline(img, 2, 2, 20, C.bark1);
+  vline(img, 25, 2, 20, C.bark1);
+  hline(img, 2, 25, 3, C.bark2);
+  for (let k = 0; k < 5; k++) {
+    const x = 5 + k * 4, c = k % 2 ? C.gray2 : C.sea2;
+    vline(img, x, 4, 5, C.sand1);
+    rect(img, x - 1, 6, 3, 6, c);
+    img.set(x, 12, c);
+    img.set(x - 1, 13, c);
+    img.set(x + 1, 13, c);
+    img.set(x, 7, C.ink);
+  }
+  return ol(img);
+}
+
+function cart(): Img {
+  const img = new Img(28, 18);
+  rect(img, 3, 6, 20, 6, C.wood);
+  hline(img, 3, 22, 6, C.sand1);
+  hline(img, 3, 22, 11, C.bark1);
+  polygon(img, [[5, 7], [13, 1], [21, 7]], (x) => (x < 13 ? C.white : C.foam2));
+  line(img, 22, 9, 27, 7, C.bark1);
+  for (const x of [7, 18]) {
+    disc(img, x, 14, 2.6, C.bark2);
+    img.set(x, 14, C.bark1);
+  }
+  return ol(img);
+}
+
+function pot(): Img {
+  const img = new Img(10, 13);
+  rect(img, 2, 7, 6, 5, C.coral);
+  hline(img, 1, 8, 7, C.red2);
+  disc(img, 5, 4, 3, C.green2);
+  img.set(4, 2, C.yellow);
+  img.set(6, 3, C.coral);
+  return ol(img);
+}
+
+function ball(): Img {
+  const img = new Img(8, 8);
+  disc(img, 4, 4, 2.8, C.white);
+  vline(img, 4, 2, 6, C.coral);
+  hline(img, 2, 6, 4, C.coral);
+  return ol(img);
+}
+
+function rods(): Img {
+  const img = new Img(12, 26);
+  line(img, 3, 24, 8, 1, C.bark2);
+  line(img, 6, 24, 10, 3, C.wood);
+  img.set(8, 1, C.coral);
+  img.set(10, 3, C.coral);
+  rect(img, 2, 22, 6, 3, C.gray1);
   return ol(img);
 }
 
@@ -608,10 +799,23 @@ export function buildTown(): SheetItem[] {
   const out: SheetItem[] = [];
   for (const [id, look] of Object.entries(PEOPLE)) out.push(...walker(`p_${id}`, look));
   out.push(
-    { name: "b_house_red", img: house({ w: 44, roofH: 22, wallH: 22, roof: [C.red2, C.red1], wall: [C.white, C.gray2] }) },
-    { name: "b_house_blue", img: house({ w: 40, roofH: 20, wallH: 22, roof: [C.sea1, C.deep2], wall: [C.sand2, C.sand1] }) },
-    { name: "b_house_brown", img: house({ w: 44, roofH: 22, wallH: 22, roof: [C.wood, C.bark2], wall: [C.white, C.gray2] }) },
-    { name: "b_house_green", img: house({ w: 40, roofH: 20, wallH: 22, roof: [C.jade2, C.jade1], wall: [C.sand2, C.sand1] }) },
+    { name: "b_house_red", img: house({ w: 44, roofH: 22, wallH: 22, roof: [C.red2, C.red1], wall: [C.white, C.gray2], chimney: true }) },
+    { name: "b_house_blue", img: house({ w: 40, roofH: 20, wallH: 22, roof: [C.sea1, C.deep2], wall: [C.sand2, C.sand1], chimney: true }) },
+    { name: "b_house_brown", img: house({ w: 44, roofH: 22, wallH: 22, roof: [C.wood, C.bark2], wall: [C.white, C.gray2], chimney: true }) },
+    { name: "b_house_green", img: house({ w: 40, roofH: 20, wallH: 22, roof: [C.jade2, C.jade1], wall: [C.sand2, C.sand1], chimney: true }) },
+    { name: "b_grandpa", img: grandpaHouse() },
+    { name: "b_saltstore", img: saltStore() },
+    { name: "o_laundry", img: laundry() },
+    { name: "o_fence", img: fence() },
+    { name: "o_garden", img: garden() },
+    { name: "o_well", img: well() },
+    { name: "o_bench", img: bench() },
+    { name: "o_sacks", img: sacks() },
+    { name: "o_fishrack", img: fishRack() },
+    { name: "o_cart", img: cart() },
+    { name: "o_pot", img: pot() },
+    { name: "o_ball", img: ball() },
+    { name: "o_rods", img: rods() },
     { name: "b_shop", img: shop([C.sea1, C.deep2], C.sea2, "bag") },
     { name: "b_shop_salt", img: shop([C.gray2, C.gray1], C.sea1, "bag") },
     { name: "b_shed", img: shed() },
