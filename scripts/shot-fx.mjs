@@ -41,8 +41,14 @@ await page.keyboard.press("ArrowRight");
 await page.waitForTimeout(150);
 await shot("fx-bag-gear");
 await page.keyboard.press("Escape");
-await scene(() => window.__sea.engine.currentScene.focus("market"));
+// the market is in the village now: 덕배 할멈 → 물고기 팔기
+await scene(() => window.__sea.engine.currentScene.focus("village"));
 await page.keyboard.press("Enter");
+await until(() => window.__sea.engine.currentScene.state.k === "village");
+await scene(() => window.__sea.engine.currentScene.warpTo("granny"));
+await page.keyboard.press("Space");
+await until(() => !!window.__sea.engine.modal);
+await scene(() => { const m = window.__sea.engine.modal; m.opts.onPick("market", m); });
 await until(() => window.__sea.engine.currentScene.state.panel === "market");
 await page.waitForTimeout(150);
 await shot("fx-market-trash");
@@ -50,6 +56,9 @@ await page.mouse.click((22 + 16 + 100) * 2, (18 + 324 - 30 + 10) * 2); // 전부
 await page.waitForTimeout(250);
 await shot("fx-sold");
 await page.keyboard.press("Escape");
+await page.waitForTimeout(100);
+await scene(() => window.__sea.game.toIsland("red_lighthouse"));
+await until(() => window.__sea.engine.currentScene.state.k === "island");
 
 // sea: a hard hit, then a hull that's nearly gone
 await scene(() => window.__sea.engine.currentScene.focus("sail"));

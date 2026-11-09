@@ -40,6 +40,8 @@ const view = () =>
       log: backend.marketLog(),
       toast: s.toast?.text ?? null,
       tension: st.reel?.tension ?? null,
+      prompt: st.prompt ?? null,
+      modal: engine.modal?.opts.title ?? null,
     };
   });
 const waitFor = async (pred, timeout = 20_000, what = "state") => {
@@ -58,6 +60,24 @@ const press = async (k) => {
   await page.waitForTimeout(60);
 };
 const worms = (v) => v.inv.bait_worm ?? 0;
+// the village: walk in, stand at a spot, answer a dialog, walk out by the pier
+const enterVillage = async () => {
+  if (!(await focus("village"))) throw new Error("no 마을 들어가기 here");
+  await press("Enter");
+  await waitFor((s) => s.k === "village", 5000, "village");
+};
+const standAt = (id) => page.evaluate((id) => window.__sea.engine.currentScene.warpTo(id), id);
+const pick = (id) =>
+  page.evaluate((id) => {
+    const m = window.__sea.engine.modal;
+    if (!m) throw new Error("no dialog open");
+    m.opts.onPick(id, m);
+  }, id);
+const leaveVillage = async () => {
+  await standAt("pier");
+  await press("Space");
+  await waitFor((s) => s.k === "island", 5000, "back at the dock");
+};
 
 async function cast() {
   await waitFor((s) => s.k === "idle", 15_000, "idle");
@@ -102,15 +122,32 @@ check("a new player starts with 50G and 20 worms", v.gold === 50 && worms(v) ===
 await page.waitForTimeout(300);
 await shot("m5-hub");
 
-// ── 2. 덕배 할멈: 20 worms, once a KST day ──
-await focus("gift");
-await press("Enter");
+// ── 2. the dock sells nothing; the village is a walk away ──
+check("the dock has no market, shop, fuel or repair", !(await focus("market")) && !(await focus("shop")) && !(await focus("fuel")) && !(await focus("repair")));
+await enterVillage();
+v = await view();
+check("마을 들어가기 → the village of 빨간등대", v.k === "village" && v.island === "red_lighthouse");
+await page.waitForTimeout(300);
+await shot("m5-village");
+// click 덕배 할멈: walk there by yourself, she asks what you want
+const at = await page.evaluate(() => {
+  const s = window.__sea.engine.currentScene;
+  const w = s.walkers.find((x) => x.def.id === "granny");
+  return [w.x - s.cam.x, w.y - 12 - s.cam.y];
+});
+await page.mouse.click(at[0] * 2, at[1] * 2);
+v = await waitFor((s) => s.modal === "덕배 할멈", 15_000, "walked to 할멈");
+check("clicking 할멈 walks up to her and opens her dialog", v.prompt === "granny", `prompt ${v.prompt}`);
+await pick("gift");
 v = await view();
 check("할멈's worms: +20", worms(v) === 40, `worms ${worms(v)}`);
-await press("Enter");
+await press("Space");
+await waitFor((s) => s.modal === "덕배 할멈", 3000, "할멈 again");
+await pick("gift");
 v = await view();
 check("…only once a day", worms(v) === 40, `worms ${worms(v)}, toast "${v.toast}"`);
-check("빨간등대 sells no fuel", !(await focus("fuel")));
+check("빨간등대 has no fuel pump", !(await standAt("fuel")));
+await leaveVillage();
 
 // ── 3. bait: reeling in before a bite keeps it, a bite uses it ──
 await focus("fish");
@@ -142,11 +179,14 @@ await press("ArrowDown");
 await press("Enter");
 await waitFor((s) => s.k === "island", 10_000, "island again");
 
-// ── 4. 시장: sell the hold at 빨간등대 (×0.8, no 특가) ──
-await focus("market");
-await press("Enter");
+// ── 4. 시장: sell the hold to 덕배 할멈 (×0.8, no 특가) ──
+await enterVillage();
+await standAt("granny");
+await press("Space");
+await waitFor((s) => s.modal === "덕배 할멈", 3000, "할멈");
+await pick("market");
 v = await waitFor((s) => s.panel === "market", 3000, "market");
-const want = await page.evaluate(() => window.__sea.engine.currentScene.marketRows().filter((r) => r.sellable).reduce((n, r) => n + r.total, 0));
+const want = await page.evaluate(() => window.__sea.engine.currentScene.sub.p.rows().filter((r) => r.sellable).reduce((n, r) => n + r.total, 0));
 await page.waitForTimeout(200);
 await shot("m5-market");
 const gold0 = v.gold;
@@ -157,13 +197,16 @@ check("the sales are noted for 수요 (포화)", Object.keys(v.log.demand).some(
 await press("Escape");
 v = await waitFor((s) => s.panel === null, 2000, "market closed");
 
-// ── 5. 수리: missing HP × 0.5G (Lv1) × 0.5 (빨간등대) ──
+// ── 5. 수리 at the boat shed: missing HP × 0.5G (Lv1) × 0.5 (빨간등대) ──
 await page.evaluate(() => (window.__sea.game.world.hullHp -= 20));
-await focus("repair");
+await standAt("repair");
+await press("Space");
+await waitFor((s) => !!s.modal, 3000, "repair dialog");
 const g1 = (await view()).gold;
-await press("Enter");
+await pick("ok");
 v = await view();
-check("배 수리: 20 HP for 5G", v.world.hullHp === 100 && v.gold === g1 - 5, `hull ${v.world.hullHp}, ${g1} → ${v.gold}G`);
+check("배 수리 at the shed: 20 HP for 5G", v.world.hullHp === 100 && v.gold === g1 - 5, `hull ${v.world.hullHp}, ${g1} → ${v.gold}G`);
+await leaveVillage();
 
 // ── 6. 물장터: the shop and fuel ──
 await page.evaluate(() => {
@@ -171,8 +214,11 @@ await page.evaluate(() => {
   window.__sea.game.toIsland("water_market");
 });
 v = await waitFor((s) => s.island === "water_market", 5000, "물장터");
-await focus("shop");
-await press("Enter");
+await enterVillage();
+await page.waitForTimeout(300);
+await shot("m5-water-market-village");
+await standAt("shop");
+await press("Space");
 v = await waitFor((s) => s.panel === "shop", 3000, "shop");
 await page.waitForTimeout(200);
 await shot("m5-shop");
@@ -196,13 +242,16 @@ check("화물칸 Lv2 → 30 slots", v.world.holdLv === 2, `hold Lv${v.world.hold
 await press("Escape");
 await waitFor((s) => s.panel === null, 2000, "shop closed");
 await page.evaluate(() => (window.__sea.game.world.fuel = 50));
-await focus("fuel");
+await standAt("fuel");
+await press("Space");
+await waitFor((s) => s.modal === "주유기", 3000, "주유기");
 const g3 = (await view()).gold;
-await press("Enter");
+await pick("ok");
 v = await view();
-check("연료 채우기: 50 for 50G", Math.round(v.world.fuel) === 100 && v.gold === g3 - 50, `fuel ${v.world.fuel}, ${g3} → ${v.gold}G`);
+check("주유기: 50 for 50G", Math.round(v.world.fuel) === 100 && v.gold === g3 - 50, `fuel ${v.world.fuel}, ${g3} → ${v.gold}G`);
 await page.waitForTimeout(200);
 await shot("m5-water-market");
+await leaveVillage();
 
 // ── 6b. 소모품: 소금 절임, 얼음 덩이 (창고 · 장비), 수리 키트 (바다에서 R) ──
 await page.evaluate(() => {

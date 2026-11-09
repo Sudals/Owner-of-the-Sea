@@ -7,6 +7,7 @@ import { buildBoats } from "./sprites/boat";
 import { buildBoatTop } from "./sprites/boatTop";
 import { buildProps } from "./sprites/props";
 import { buildUi } from "./sprites/ui";
+import { buildTown } from "./sprites/town";
 import { Img } from "./lib/image";
 import { BG_H, BG_W, DOCK, DOCK_LOOKS, HORIZON, lutVariants, renderDock, renderSea, SEAS, WATERLINE, type DockLook } from "./sprites/backgrounds";
 import { writeFileSync } from "node:fs";
@@ -45,6 +46,7 @@ const groups: Group[] = [
   { name: "pollutants", build: buildPollutants, meta: () => ({ bosses: BOSS_META }), preview: { scale: 3, cols: 2 } },
   { name: "owner", build: buildOwner, preview: { scale: 2, cols: 1 } },
   { name: "sky", build: buildSky, preview: { scale: 4, cols: 2 } },
+  { name: "town", build: buildTown, meta: () => ({ people: "p_{id}_{down|up|left|right}_{0|1|2}: 16×24, feet at the bottom row; b_* buildings and o_* props are drawn bottom-anchored" }), preview: { scale: 4, cols: 12 } },
 ];
 
 for (const g of groups) {

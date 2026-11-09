@@ -14,7 +14,7 @@ export type BgMeta = {
   seas: string[];
 };
 
-export const ATLASES = ["fish", "angler", "boat", "boat_top", "props", "ui", "pollutants", "sky"] as const;
+export const ATLASES = ["fish", "angler", "boat", "boat_top", "props", "ui", "pollutants", "sky", "town"] as const;
 export type AtlasName = (typeof ATLASES)[number];
 export const BACKGROUNDS = ["bg_dock", "bg_dock_market", "bg_dock_salt", "bg_dock_village", "bg_sea_jade", "bg_sea_azure", "bg_sea_indigo", "bg_sea_ink"] as const;
 export type BgName = (typeof BACKGROUNDS)[number];

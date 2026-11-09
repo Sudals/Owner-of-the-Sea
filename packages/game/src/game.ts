@@ -8,6 +8,7 @@ import { FishingScene, type Spot } from "./scenes/fishing";
 import { IslandScene, type ArrivalNote } from "./scenes/island";
 import { SeaScene } from "./scenes/sea";
 import { TitleScene } from "./scenes/title";
+import { VillageScene } from "./scenes/village";
 import { Settings } from "./settings";
 import { Clock } from "./systems/timeOfDay";
 import { Modal } from "./ui/modal";
@@ -265,6 +266,12 @@ export class Game {
   }
 
   /** Cast off from an island (boat at its dock, bow away from the island) or return to the sea. */
+  /** Walk into an island's village (its market, shops, fuel, repairs). */
+  toVillage(id: string): void {
+    this.save();
+    this.engine.setScene(new VillageScene(this, id));
+  }
+
   toSea(fromIsland?: string): void {
     if (fromIsland) {
       const isl = ISLAND_BY_ID[fromIsland]!;

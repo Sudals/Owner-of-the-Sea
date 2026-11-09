@@ -8,6 +8,7 @@ import type { Engine, Scene } from "../engine";
 import type { Game } from "../game";
 import { drawChart, Explored, renderChart } from "../render/chart";
 import { drawTinted, Fx } from "../render/fx";
+import { drawDayTint } from "../render/tint";
 import { InventoryPanel } from "../ui/inventoryPanel";
 import { pixelLine } from "../render/pixels";
 import { isBaked, SeaView, WORLD_H, WORLD_W } from "../render/seaView";
@@ -839,18 +840,7 @@ export class SeaScene implements Scene {
 
   /** Morning / sunset / night as a multiply tint over the world (not the HUD). */
   private drawTint(ctx: CanvasRenderingContext2D): void {
-    const { a, b, t } = this.game.clock.blend();
-    ctx.save();
-    for (const [name, w] of [[a, 1 - t], [b, t]] as const) {
-      if (w <= 0) continue;
-      for (const layer of TINT[name] ?? []) {
-        ctx.globalCompositeOperation = layer.mode;
-        ctx.globalAlpha = layer.alpha * w;
-        ctx.fillStyle = layer.color;
-        ctx.fillRect(0, 0, VIEW_W, VIEW_H);
-      }
-    }
-    ctx.restore();
+    drawDayTint(ctx, this.game.clock, VIEW_W, VIEW_H);
   }
 
   private drawHud(ctx: CanvasRenderingContext2D, engine: Engine, lut: LutName): void {
@@ -918,15 +908,6 @@ export class SeaScene implements Scene {
 }
 
 /** Time-of-day light over the top-down world: warm soft light at dawn and dusk, a deep blue at night. */
-const TINT: Partial<Record<LutName, { color: string; alpha: number; mode: GlobalCompositeOperation }[]>> = {
-  morning: [{ color: "#ffc59a", alpha: 0.5, mode: "soft-light" }],
-  sunset: [
-    { color: "#c97a8c", alpha: 0.55, mode: "multiply" },
-    { color: "#ff9a50", alpha: 0.3, mode: "overlay" },
-  ],
-  night: [{ color: "#28366e", alpha: 0.8, mode: "multiply" }],
-};
-
 /** A small pixel anchor (7×9) centered on (cx, cy), with a dark shadow so it reads on any water. */
 function drawAnchor(ctx: CanvasRenderingContext2D, cx: number, cy: number, color: string): void {
   const rows = ["..XXX..", "..X.X..", "..XXX..", "XXXXXXX", "...X...", "...X...", "X..X..X", ".X.X.X.", "..XXX.."];
