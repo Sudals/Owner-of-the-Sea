@@ -385,12 +385,15 @@ export class RemoteBackend implements GameBackend {
       .map((s) => ({ sessionId: s.sessionId, sig: s.sig, casts: [...(this.j.pending[s.sessionId] ?? [])], closed: s.closed }));
     if (!sessions.length && !this.j.dirty && !this.j.ops.length) return null;
     const w = this.world();
+    // the fish this batch sells were on board until the sale: list them too, or a server that
+    // drops what isn't listed before replaying the trades finds nothing to sell
+    const sold = this.j.ops.flatMap((op) => (op.kind === "sell" ? op.ids : []));
     return {
       batchId: crypto.randomUUID(),
       reason,
       sessions,
       world: { at: w.at, hullHp: w.hullHp, fuel: w.fuel, day: w.day, hour: w.hour, seaTime: w.seaTime, chart: w.chart },
-      holdIds: this.j.hold.map((h) => h.id).filter((x): x is string => !!x),
+      holdIds: [...new Set([...this.j.hold.map((h) => h.id).filter((x): x is string => !!x), ...sold])],
       ops: [...this.j.ops],
     };
   }
@@ -406,12 +409,13 @@ export class RemoteBackend implements GameBackend {
       return { ok: false, message: e instanceof ApiError ? `저장 실패 — ${e.message}` : "저장 실패 — 연결되면 다시 시도해 주세요" };
     }
     this.apply(res, body, version);
-    const caught = res.applied.caught, bad = res.rejected.length;
+    const caught = res.applied.caught, bad = res.rejected.length, badOps = res.rejectedOps.length;
     return {
       ok: true,
       caught,
       rejected: bad,
-      message: `저장했다${caught ? ` · 물고기 ${caught}마리 기록` : ""}${bad ? ` · 맞지 않는 기록 ${bad}건 제외` : ""}`,
+      rejectedOps: badOps,
+      message: `저장했다${caught ? ` · 물고기 ${caught}마리 기록` : ""}${bad ? ` · 맞지 않는 기록 ${bad}건 제외` : ""}${badOps ? ` · 거래 ${badOps}건은 서버에서 취소` : ""}`,
     };
   }
 

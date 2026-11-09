@@ -102,6 +102,30 @@ check("/me agrees after the save", me.json.gold === r.json.gold && me.json.inven
   check("no kit / no salt left are refused", JSON.stringify(r2.json.rejectedOps.map((o: any) => o.why)) === '["none","none"]', JSON.stringify(r2.json.rejectedOps));
 }
 
+// ── the game's own order: the catch is saved on docking, the sale on closing the market. The
+// client's holdIds then no longer list the sold fish (old clients send exactly this) ──
+{
+  const s3 = (await api("POST", "/session/open", { spotId: "red_lighthouse_dock" }, tok)).json;
+  let t3 = Date.now();
+  const casts3 = [];
+  const ids: string[] = [];
+  for (let i = s3.nextIndex; i < s3.nextIndex + 2; i++) {
+    const roll = roll0(s3.seed, i, s3.pointId);
+    t3 += Math.ceil(CAST_MS + roll.waitSec * 1000 + 750);
+    casts3.push({ i, fishId: roll.fishId, sizeCm: roll.sizeCm, result: "caught", reelMs: 700, t: t3, seaT: 0, bait: "bait_worm" });
+    ids.push(`${s3.sessionId}:${i}`);
+  }
+  const world = { at: { kind: "island", id: "red_lighthouse" }, hullHp: 100, fuel: 100, day: 1, hour: 11, seaTime: 0, chart: "" };
+  const dock = await api("POST", "/save", { batchId: crypto.randomUUID(), reason: "dock", sessions: [{ sessionId: s3.sessionId, sig: s3.sig, closed: true, casts: casts3 }], world, holdIds: [], ops: [] }, tok);
+  const before = dock.json.gold as number;
+  const shop = await api("POST", "/save", { batchId: crypto.randomUUID(), reason: "shop", sessions: [], world, holdIds: [], ops: [{ kind: "sell", island: "red_lighthouse", ids, t: t3 + 2000 }] }, tok);
+  check(
+    "fish saved earlier, sold in the next save: the sale goes through",
+    shop.status === 200 && shop.json.rejectedOps.length === 0 && shop.json.gold > before && shop.json.hold.length === 0,
+    `${before}G → ${shop.json.gold}G, hold ${shop.json.hold?.length}, refused ${JSON.stringify(shop.json.rejectedOps)}`,
+  );
+}
+
 console.log(`\nCREATED ${name}`);
 console.log(failed ? `${failed} failed` : "ALL PASSED");
 process.exit(failed ? 1 : 0);

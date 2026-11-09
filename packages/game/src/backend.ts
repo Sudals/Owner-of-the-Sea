@@ -32,7 +32,7 @@ export type SessionSpot = {
 };
 
 export type SaveReason = "manual" | "dock" | "exit" | "recover" | "lobby" | "shop";
-export type SaveOutcome = { ok: boolean; message: string; caught?: number; rejected?: number };
+export type SaveOutcome = { ok: boolean; message: string; caught?: number; rejected?: number; /** Trades the server refused (their gold is undone). */ rejectedOps?: number };
 export type SaveStatus = { lastSavedAt: number | null; unsavedCaught: number; dirty: boolean };
 
 /** released = caught, but let go because the hold was full. */

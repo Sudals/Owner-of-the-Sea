@@ -114,7 +114,9 @@ async function apply(tx: Tx, accountId: string, body: SaveRequest, cur: { versio
 
   // ── the ledger the trades and catches play out on ──
   const { patch, flags } = applyReported(p, body.world);
-  const keep = new Set(body.holdIds);
+  // holdIds is the hold *after* this batch: fish sold by its trades are gone from it, yet they were
+  // on board when the sale happened — keep them until the sale is replayed below
+  const keep = new Set([...body.holdIds, ...body.ops.flatMap((op) => (op.kind === "sell" ? op.ids : []))]);
   const clockEnd = patch.seaTime ?? p.seaTime;
   const ledger: Ledger = {
     gold: p.gold,

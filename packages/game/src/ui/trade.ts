@@ -97,7 +97,8 @@ export class Trader {
     if (!this.traded || !this.game.remote) return;
     this.traded = false;
     void this.game.commit("shop").then((r) => {
-      if (!r.ok) this.game.flash(r.message, 3, lutHex("coral"));
+      // a trade the server refused is undone: say so, the gold just changed under the player
+      if (!r.ok || r.rejectedOps) this.game.flash(r.message, 3, lutHex("coral"));
     });
   }
 }
