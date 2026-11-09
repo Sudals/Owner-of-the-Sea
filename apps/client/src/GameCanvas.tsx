@@ -64,6 +64,10 @@ export function GameCanvas() {
   return (
     <>
       <div ref={host} className="game-host" />
+      <div className="rotate-hint" aria-hidden="true">
+        <span>↻</span>
+        화면을 가로로 돌려 주세요
+      </div>
       {progress && !error && <div className="loading">{progress}</div>}
       {error && <div className="loading error">{error}</div>}
     </>

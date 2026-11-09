@@ -37,6 +37,7 @@ export async function createGame(host: HTMLElement, opts: GameOptions): Promise<
   const assets = await Assets.load(opts.assetBase ?? "/assets/", opts.onProgress);
   const engine = new Engine(host, { assets, dev: opts.dev });
   const game = new Game(engine, opts.backend, opts.mode ?? "full", opts.quit ?? null, opts.version ?? "");
+  engine.setScaleMode(game.settings.data.display);
   game.toTitle();
   engine.start();
   return { engine, game };

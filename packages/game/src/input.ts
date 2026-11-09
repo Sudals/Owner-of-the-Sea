@@ -31,7 +31,11 @@ export class Input {
   private pendingWheel = 0;
   private readonly off: (() => void)[] = [];
 
-  constructor(private readonly target: HTMLElement) {
+  constructor(
+    private readonly target: HTMLElement,
+    /** The game's rectangle inside `target`, CSS px (the canvas may be larger than the game). */
+    private readonly viewRect?: () => { x: number; y: number; w: number; h: number },
+  ) {
     const on = <K extends keyof WindowEventMap>(el: Window | HTMLElement, type: K, fn: (e: WindowEventMap[K]) => void, opts?: AddEventListenerOptions) => {
       el.addEventListener(type, fn as EventListener, opts);
       this.off.push(() => el.removeEventListener(type, fn as EventListener, opts));
@@ -134,7 +138,8 @@ export class Input {
   private track(e: PointerEvent): void {
     const r = this.target.getBoundingClientRect();
     if (!r.width || !r.height) return;
-    this.pointer = { x: ((e.clientX - r.left) / r.width) * 640, y: ((e.clientY - r.top) / r.height) * 360 };
+    const v = this.viewRect?.() ?? { x: 0, y: 0, w: r.width, h: r.height };
+    this.pointer = { x: ((e.clientX - r.left - v.x) / v.w) * 640, y: ((e.clientY - r.top - v.y) / v.h) * 360 };
   }
 
   private pollGamepad(): void {

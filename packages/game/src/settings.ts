@@ -3,14 +3,17 @@
 
 const KEY = "sea.settings.v1";
 
+export type DisplayMode = "fit" | "sharp";
 export type SettingsData = {
   /** 0–10 */
   bgm: number;
   /** 0–10 */
   sfx: number;
+  /** 화면: fill the window (fit) or whole multiples only (sharp). */
+  display: DisplayMode;
 };
 
-const DEFAULTS: SettingsData = { bgm: 7, sfx: 7 };
+const DEFAULTS: SettingsData = { bgm: 7, sfx: 7, display: "fit" };
 
 export class Settings {
   data: SettingsData;
@@ -21,10 +24,11 @@ export class Settings {
       const raw = this.storage?.getItem(KEY);
       if (raw) {
         const saved = JSON.parse(raw) as Partial<SettingsData>;
-        for (const k of Object.keys(DEFAULTS) as (keyof SettingsData)[]) {
+        for (const k of ["bgm", "sfx"] as const) {
           const v = saved[k];
           if (typeof v === "number" && Number.isFinite(v)) this.data[k] = clampLevel(v);
         }
+        if (saved.display === "fit" || saved.display === "sharp") this.data.display = saved.display;
       }
     } catch {
       // unreadable settings fall back to defaults
@@ -32,7 +36,7 @@ export class Settings {
   }
 
   set<K extends keyof SettingsData>(key: K, value: SettingsData[K]): void {
-    this.data[key] = clampLevel(value);
+    this.data[key] = (typeof value === "number" ? clampLevel(value) : value) as SettingsData[K];
     try {
       this.storage?.setItem(KEY, JSON.stringify(this.data));
     } catch {

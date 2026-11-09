@@ -35,6 +35,28 @@ body {
   place-items: center;
 }
 
+/* phones and tablets held upright: the game is landscape */
+.rotate-hint {
+  display: none;
+}
+@media (orientation: portrait) and (pointer: coarse) {
+  .rotate-hint {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    display: grid;
+    place-content: center;
+    gap: 12px;
+    text-align: center;
+    background: rgba(13, 15, 28, 0.94);
+    color: var(--foam);
+    font-size: 18px;
+  }
+  .rotate-hint span {
+    font-size: 40px;
+  }
+}
+
 .loading {
   position: fixed;
   inset: 0;

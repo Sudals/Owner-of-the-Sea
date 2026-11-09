@@ -118,6 +118,7 @@ export class TitleScene implements Scene {
           { id: "bgm", label: "배경음", rect: row(), kind: "slider" },
           { id: "sfx", label: "효과음", rect: row(), kind: "slider" },
           { id: "fullscreen", label: "전체 화면", rect: row(), kind: "row" },
+          { id: "display", label: "화면", rect: row(), kind: "row" },
         ];
         if (p?.recoveryCode) list.push({ id: "showCode", label: "이어하기 코드", rect: row(), kind: "row" });
         if (p) list.push({ id: "forget", label: "이 기기의 기록", rect: row(), kind: "row" });
@@ -132,7 +133,7 @@ export class TitleScene implements Scene {
   /** The settings panel grows with its rows (the code / forget rows only exist with a save). */
   private settingsRect(): Rect {
     const p = this.profile;
-    const rows = 3 + (p?.recoveryCode ? 1 : 0) + (p ? 1 : 0);
+    const rows = 4 + (p?.recoveryCode ? 1 : 0) + (p ? 1 : 0);
     const h = 40 + rows * 30 + 62;
     return { x: 320 - SETTINGS_W / 2, y: Math.round(180 - h / 2), w: SETTINGS_W, h };
   }
@@ -340,6 +341,12 @@ export class TitleScene implements Scene {
       case "settings":
         if (id === "close") return this.go({ k: "menu" });
         if (id === "fullscreen") return void this.game.settings.toggleFullscreen();
+        if (id === "display") {
+          const next = this.game.settings.data.display === "fit" ? "sharp" : "fit";
+          this.game.settings.set("display", next);
+          this.engine.setScaleMode(next);
+          return;
+        }
         if (id === "showCode" && p?.recoveryCode)
           return this.go({ k: "notice", title: "이어하기 코드", back: "settings", big: p.recoveryCode, lines: ["다른 PC의 로비 → 이어하기에서", "이 코드를 넣으면 같은 기록으로 이어져요."] });
         if (id === "forget" && p)
@@ -594,7 +601,11 @@ export class TitleScene implements Scene {
         gaugeH(ctx, assets, c.gauge.x, c.gauge.y, c.gauge.w, v / 10, lutHex("sea3"), [0.2, 0.4, 0.6, 0.8]);
         button(ctx, assets, v >= 10 ? "disabled" : "normal", "+", c.plus.x, c.plus.y, c.plus.w, c.plus.h);
       } else {
-        const label = it.id === "fullscreen" ? (st.fullscreen ? "켬" : "끔") : it.id === "showCode" ? "코드 보기" : `${p?.name ?? ""} 지우기`;
+        const label =
+          it.id === "fullscreen" ? (st.fullscreen ? "켬" : "끔")
+          : it.id === "display" ? (st.data.display === "fit" ? "꽉 차게" : "선명하게 (정수배)")
+          : it.id === "showCode" ? "코드 보기"
+          : `${p?.name ?? ""} 지우기`;
         button(ctx, assets, focus ? "hover" : "normal", label, c.whole.x, c.whole.y, c.whole.w, c.whole.h);
       }
     });
