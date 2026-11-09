@@ -1,6 +1,6 @@
 {
   "name": "@sea/desktop",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "private": true,
   "description": "바다의 주인 — Windows desktop app (Electron): loads the client full build over app://",
   "main": "dist/main.js",
