@@ -1,6 +1,6 @@
 import { devShiftDays, fuelMax, holdCap, HULLS, ISLAND_BY_ID, ITEMS, kstDate, type ItemId, type Market } from "@sea/shared";
 import { lutHex } from "../assets";
-import type { Engine, Scene } from "../engine";
+import { followCam, VIEW_H, VIEW_W, type Engine, type Scene } from "../engine";
 import type { Game } from "../game";
 import { Fx } from "../render/fx";
 import { drawDayTint, isNight } from "../render/tint";
@@ -15,10 +15,9 @@ import { villageOf, type Facing, type Npc, type Poi, type Prop, type Service, ty
 // WASD / click), and the market, shops, fuel, repairs and 덕배 할멈's worms are people and places
 // you have to walk up to — Space when the prompt shows. Leaving by the pier goes back to the boat.
 
-const VIEW_W = 640, VIEW_H = 360;
 const SPEED = 70; // px/s
 const NPC_SPEED = 28;
-const PROMPT_BTN = { x: 320 - 140, y: 318, w: 280, h: 20 };
+const PROMPT_W = 280;
 
 type Walker = { def: Npc; x: number; y: number; dir: Facing; wp: number; wait: number; moving: boolean; t: number; lookT: number; hop: number };
 type Puff = { x: number; y: number; vx: number; t: number; life: number };
@@ -42,6 +41,8 @@ const tileOf = (px: number, py: number): [number, number] => [Math.floor(px / TL
 const feetAt = (tx: number, ty: number): [number, number] => [(tx + 0.5) * TL, ty * TL + 13];
 
 export class VillageScene implements Scene {
+  /** Top-down: a wider window shows more of the village and the sea around it (engine.ts). */
+  readonly wide = true;
   private engine!: Engine;
   private readonly def: VillageDef;
   private ground: BakedGround | null = null;
@@ -59,6 +60,8 @@ export class VillageScene implements Scene {
   private greeted = new Set<string>();
   private t = 0;
   readonly fx = new Fx();
+  /** Trade effects (gold, the purse), in layout coordinates over the HUD and panels. */
+  readonly uiFx = new Fx();
   private readonly trader: Trader;
   private cam = { x: 0, y: 0 };
   private puffs: Puff[] = [];
@@ -86,7 +89,10 @@ export class VillageScene implements Scene {
       }),
       ...Array.from({ length: this.def.gulls ?? 0 }, (_, i): Gull => ({ x: center[0], y: center[1], z: 30 + i * 6, perch: null, mode: "circle", a: i * 2.1, r: 170 + i * 26, speed: 0.18 + i * 0.04, back: 0, flip: false })),
     ];
-    this.trader = new Trader(game, islandId, this.fx, (s, bad) => this.say(s, 2.5, bad ? lutHex("coral") : undefined), () => (this.sub ? [BIG.x + BIG.w - 50, BIG.y + 26] : [60, 34]));
+    this.trader = new Trader(game, islandId, this.uiFx, (s, bad) => this.say(s, 2.5, bad ? lutHex("coral") : undefined), () => {
+      const b = game.engine.bounds;
+      return this.sub ? [BIG.x + BIG.w - 50, BIG.y + 26] : [b.left + 60, b.top + 34];
+    });
     const m = this.market;
     this.pois = this.def.pois.filter((p) => p.services.some((s) => this.offers(s, m)));
     this.solid = new Uint8Array(this.def.w * this.def.h);
@@ -123,8 +129,25 @@ export class VillageScene implements Scene {
 
   enter(engine: Engine): void {
     this.engine = engine;
-    this.ground = bakeGround(this.def);
+    this.bake();
     this.game.save();
+  }
+
+  /** Bake the ground with as much sea around the map as the view needs (again if the window
+   *  grows past it). */
+  private bake(): void {
+    const e = this.engine;
+    const need = (view: number, map: number) => Math.max(0, Math.ceil((view - map) / 2 / TL)) + 1;
+    const mx = need(e?.viewW ?? VIEW_W, this.def.w * TL), my = need(e?.viewH ?? VIEW_H, this.def.h * TL);
+    if (this.ground && this.ground.mx >= mx && this.ground.my >= my) return;
+    this.ground = bakeGround(this.def, mx, my);
+  }
+
+  private get vw(): number {
+    return this.engine?.viewW ?? VIEW_W;
+  }
+  private get vh(): number {
+    return this.engine?.viewH ?? VIEW_H;
   }
 
   private say(s: string, seconds = 2.5, color?: string): void {
@@ -292,6 +315,7 @@ export class VillageScene implements Scene {
   update(dt: number, engine: Engine): void {
     this.t += dt;
     this.fx.update(dt);
+    this.uiFx.update(dt);
     this.game.tick(dt, false);
     if (this.toast && this.t > this.toast.until) this.toast = null;
     if (this.bubble && this.t > this.bubble.until) this.bubble = null;
@@ -316,7 +340,8 @@ export class VillageScene implements Scene {
       const c = input.clicked;
       const here = this.near();
       if (here && inRect(c, this.promptRect())) return this.use(here);
-      const wx = this.cam.x + c.x, wy = this.cam.y + c.y;
+      // layout → view → world
+      const wx = this.cam.x + engine.safe.x + c.x, wy = this.cam.y + engine.safe.y + c.y;
       const target = this.poiAt(wx, wy);
       if (target) {
         const r = this.findRoute(target.x, target.y);
@@ -505,37 +530,40 @@ export class VillageScene implements Scene {
     }
   }
 
+  /** The view's top-left in the world: following you, or the whole village centered when the
+   *  view is larger than it (a wide window). */
   private camera(): { x: number; y: number } {
-    const W = this.def.w * TL, H = this.def.h * TL;
-    return {
-      x: Math.round(Math.max(0, Math.min(W - VIEW_W, this.pc.x - VIEW_W / 2))),
-      y: Math.round(Math.max(0, Math.min(H - VIEW_H, this.pc.y - 8 - VIEW_H / 2))),
-    };
+    return { x: followCam(this.pc.x, this.def.w * TL, this.vw), y: followCam(this.pc.y - 8, this.def.h * TL, this.vh) };
   }
 
+  /** The Space prompt, pinned to the bottom of the view (layout coordinates). */
   private promptRect() {
     const p = this.near();
     const s = p ? `Space · ${p.who}` : "";
-    const w = Math.max(PROMPT_BTN.w, s.length * 8 + 40);
-    return { ...PROMPT_BTN, x: 320 - w / 2, w };
+    const w = Math.max(PROMPT_W, s.length * 8 + 40);
+    const b = this.engine?.bounds ?? { bottom: VIEW_H };
+    return { x: 320 - w / 2, y: b.bottom - 42, w, h: 20 };
   }
 
   // ── render ─────────────────────────────────────────────────────────────────
 
   render(ctx: CanvasRenderingContext2D, engine: Engine): void {
-    const assets = engine.assets;
-    const shake = this.fx.offset();
-    const cam = { x: this.cam.x + shake.x, y: this.cam.y + shake.y };
-    ctx.fillStyle = lutHex("jade3");
-    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    const assets = engine.assets, vw = this.vw, vh = this.vh;
+    const shake = this.fx.offset(), shake2 = this.uiFx.offset();
+    this.cam = this.camera(); // the window may have changed shape since the last step
+    const cam = { x: this.cam.x + shake.x + shake2.x, y: this.cam.y + shake.y + shake2.y };
+    this.bake();
+    ctx.fillStyle = lutHex("jade2");
+    ctx.fillRect(0, 0, vw, vh);
     if (this.ground) {
-      ctx.drawImage(this.ground.ground, -cam.x, -cam.y);
+      const gx = -cam.x - this.ground.ox, gy = -cam.y - this.ground.oy;
+      ctx.drawImage(this.ground.ground, gx, gy);
       // the water laps at the shore: two foam rings fading in turn
       const k = (Math.sin(this.t * 1.7) + 1) / 2;
       ctx.globalAlpha = 0.2 + 0.8 * k;
-      ctx.drawImage(this.ground.foamIn, -cam.x, -cam.y);
+      ctx.drawImage(this.ground.foamIn, gx, gy);
       ctx.globalAlpha = 0.1 + 0.7 * (1 - k);
-      ctx.drawImage(this.ground.foamOut, -cam.x, -cam.y);
+      ctx.drawImage(this.ground.foamOut, gx, gy);
       ctx.globalAlpha = 1;
     }
     this.drawWaterGlints(ctx, cam);
@@ -565,12 +593,15 @@ export class VillageScene implements Scene {
 
     this.drawAmbient(ctx, cam);
     this.drawMarkers(ctx, cam);
-    drawDayTint(ctx, this.game.clock);
+    drawDayTint(ctx, this.game.clock, vw, vh);
     if (isNight(this.game.clock)) this.drawLights(ctx, cam);
     this.drawLabels(ctx, cam);
     this.fx.draw(ctx, cam.x, cam.y);
-    this.drawHud(ctx, engine);
 
+    // HUD and panels: laid out in 640×360 (centered in a wide view), HUD pinned to the corners
+    ctx.save();
+    ctx.translate(engine.safe.x, engine.safe.y);
+    this.drawHud(ctx, engine);
     if (this.sub) this.sub.p.render(ctx, engine);
     if (this.pause) {
       dim(ctx, 0.5);
@@ -580,12 +611,15 @@ export class VillageScene implements Scene {
     }
     if (this.toast) {
       const tw = Math.min(620, Math.max(160, textWidth(ctx, this.toast.text) + 28));
-      const ty = this.sub ? 2 : 40;
+      const ty = this.sub ? 2 : engine.bounds.top + 40;
       panel(ctx, assets, "panel_sea", 320 - tw / 2, ty, tw, 22);
       text(ctx, this.toast.text, 320, ty + 5, { align: "center", color: this.toast.color, maxW: tw - 20 });
     }
-    this.fx.drawScreen(ctx);
+    this.uiFx.draw(ctx, 0, 0);
     this.game.drawFlash(ctx, assets);
+    ctx.restore();
+    this.fx.drawScreen(ctx);
+    this.uiFx.drawScreen(ctx);
   }
 
   private drawPerson(ctx: CanvasRenderingContext2D, look: string, x: number, y: number, dir: Facing, t: number, cam: { x: number; y: number }): void {
@@ -708,9 +742,9 @@ export class VillageScene implements Scene {
   private drawWaterGlints(ctx: CanvasRenderingContext2D, cam: { x: number; y: number }): void {
     ctx.fillStyle = lutHex("white");
     const tx0 = Math.floor(cam.x / TL), ty0 = Math.floor(cam.y / TL);
-    for (let ty = ty0; ty <= ty0 + VIEW_H / TL + 1; ty++)
-      for (let tx = tx0; tx <= tx0 + VIEW_W / TL + 1; tx++) {
-        if (this.def.ground[ty]?.[tx] !== "~") continue;
+    for (let ty = ty0; ty <= ty0 + this.vh / TL + 1; ty++)
+      for (let tx = tx0; tx <= tx0 + this.vw / TL + 1; tx++) {
+        if ((this.def.ground[ty]?.[tx] ?? "~") !== "~") continue; // past the map: open sea
         const h = ((tx * 73856093) ^ (ty * 19349663)) >>> 0;
         const phase = (this.t * 0.6 + (h % 997) / 140) % 3;
         if (phase > 0.45) continue;
@@ -780,7 +814,7 @@ export class VillageScene implements Scene {
       if (w) {
         const s = this.bubble.text;
         const bw = Math.min(300, textWidth(ctx, s) + 16);
-        const x = Math.round(Math.max(4, Math.min(VIEW_W - bw - 4, w.x - cam.x - bw / 2))), y = Math.round(w.y - 66 - cam.y);
+        const x = Math.round(Math.max(4, Math.min(this.vw - bw - 4, w.x - cam.x - bw / 2))), y = Math.round(w.y - 66 - cam.y);
         panel(ctx, this.engine.assets, "panel_paper", x, y, bw, 22);
         text(ctx, s, x + bw / 2, y + 5, { align: "center", color: lutHex("ink"), shadow: null, maxW: bw - 12 });
       }
@@ -792,18 +826,19 @@ export class VillageScene implements Scene {
     const bait = Object.entries(be.inventory()).reduce((n, [id, q]) => n + (ITEMS[id as ItemId]?.kind === "bait" ? (q ?? 0) : 0), 0);
     const s = `${be.gold().toLocaleString("ko-KR")}G · 창고 ${be.hold().length}/${holdCap(w.holdLv)} · 연료 ${Math.ceil(w.fuel)}/${fuelMax(w)} · 선체 ${Math.ceil(w.hullHp)}/${HULLS[w.hullLv].hp} · 미끼 ${bait}`;
     const tw = textWidth(ctx, s) + 20;
-    panel(ctx, assets, "panel_sea", 8, 8, tw, 22);
-    text(ctx, s, 18, 13);
+    const b = engine.bounds, L = b.left, T = b.top;
+    panel(ctx, assets, "panel_sea", L + 8, T + 8, tw, 22);
+    text(ctx, s, L + 18, T + 13);
     const isl = ISLAND_BY_ID[this.islandId]!;
-    text(ctx, `${isl.name} 마을 · ${w.day}일차 ${this.game.clock.label()}`, 632, 13, { align: "right", color: lutHex("white") });
+    text(ctx, `${isl.name} 마을 · ${w.day}일차 ${this.game.clock.label()}`, b.right - 8, T + 13, { align: "right", color: lutHex("white") });
     const here = this.near();
     if (here && !this.sub && !this.pause && !engine.modal) {
       const r = this.promptRect();
       button(ctx, assets, "hover", `Space · ${here.who}`, r.x, r.y, r.w, r.h);
     } else if (!this.sub && !this.pause) {
-      text(ctx, "방향키·클릭 이동 · Space 말 걸기 · I 창고 · Esc 메뉴", 320, 324, { align: "center", color: lutHex("foam2") });
+      text(ctx, "방향키·클릭 이동 · Space 말 걸기 · I 창고 · Esc 메뉴", 320, b.bottom - 36, { align: "center", color: lutHex("foam2") });
     }
-    this.game.drawSaveLabel(ctx, assets, 8, 344);
+    this.game.drawSaveLabel(ctx, assets, L + 8, b.bottom - 16);
   }
 }
 

@@ -8,7 +8,8 @@ export class Input {
   pressed = false;
   /** Went up since the previous step. */
   released = false;
-  /** Pointer position in view pixels (640×360 space), or null when unknown. */
+  /** Pointer position in layout pixels (the 640×360 space every scene lays out in; a wide
+   *  scene's view reaches past it on its sides), or null when unknown. */
   pointer: { x: number; y: number } | null = null;
   /** Where the pointer went down since the previous step (menus hit-test this), or null. */
   clicked: { x: number; y: number } | null = null;
@@ -33,8 +34,9 @@ export class Input {
 
   constructor(
     private readonly target: HTMLElement,
-    /** The game's rectangle inside `target`, CSS px (the canvas may be larger than the game). */
-    private readonly viewRect?: () => { x: number; y: number; w: number; h: number },
+    /** The game's rectangle inside `target` (CSS px; the canvas may be larger than the game),
+     *  the view's size in game pixels and where the 640×360 layout sits in it. */
+    private readonly viewRect?: () => { x: number; y: number; w: number; h: number; vw: number; vh: number; ox: number; oy: number },
   ) {
     const on = <K extends keyof WindowEventMap>(el: Window | HTMLElement, type: K, fn: (e: WindowEventMap[K]) => void, opts?: AddEventListenerOptions) => {
       el.addEventListener(type, fn as EventListener, opts);
@@ -134,12 +136,12 @@ export class Input {
     this.raw = now;
   }
 
-  /** Map the canvas box onto the 640×360 view, whatever its CSS size. */
+  /** Map the canvas box onto the view, then into layout coordinates, whatever its CSS size. */
   private track(e: PointerEvent): void {
     const r = this.target.getBoundingClientRect();
     if (!r.width || !r.height) return;
-    const v = this.viewRect?.() ?? { x: 0, y: 0, w: r.width, h: r.height };
-    this.pointer = { x: ((e.clientX - r.left - v.x) / v.w) * 640, y: ((e.clientY - r.top - v.y) / v.h) * 360 };
+    const v = this.viewRect?.() ?? { x: 0, y: 0, w: r.width, h: r.height, vw: 640, vh: 360, ox: 0, oy: 0 };
+    this.pointer = { x: ((e.clientX - r.left - v.x) / v.w) * v.vw - v.ox, y: ((e.clientY - r.top - v.y) / v.h) * v.vh - v.oy };
   }
 
   private pollGamepad(): void {

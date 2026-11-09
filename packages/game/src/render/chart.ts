@@ -2,7 +2,7 @@ import { ISLANDS, Kind, MAP_H, MAP_W, mapPoints, seaGrid, SEA_NAME, SEA_ORDER, s
 import { COLORS } from "@sea/sprites/palette";
 import type { Assets } from "../assets";
 import { lutHex } from "../assets";
-import { panel, text } from "./ui";
+import { dim, panel, text } from "./ui";
 
 // 해도 (design §3-3): a parchment chart of the whole sea. Only explored tiles are drawn
 // (fog of war); islands, fishing points and storms show once their spot has been seen.
@@ -98,10 +98,7 @@ export type ChartMarks = { boat: { x: number; y: number }; clockH: number; t: nu
 /** Draw the 해도 overlay over the whole view. */
 export function drawChart(ctx: CanvasRenderingContext2D, assets: Assets, chart: HTMLCanvasElement, explored: Explored, m: ChartMarks): void {
   const ox = Math.round((640 - CHART_W) / 2), oy = 50;
-  ctx.globalAlpha = 0.6;
-  ctx.fillStyle = lutHex("ink");
-  ctx.fillRect(0, 0, 640, 360);
-  ctx.globalAlpha = 1;
+  dim(ctx, 0.6);
   panel(ctx, assets, "panel_paper", ox - 12, oy - 34, CHART_W + 24, CHART_H + 58);
   text(ctx, "해도", 320, oy - 26, { align: "center", color: lutHex("red2"), shadow: null, font: "bold 12px Galmuri11, monospace" });
   const pct = Math.round((explored.count() / (MAP_W * MAP_H)) * 100);

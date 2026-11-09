@@ -124,6 +124,23 @@ export const balanceSchema = z
         baseSpeed: z.number().positive(),
         rodSpeed: z.array(z.number().positive()).min(1),
         lineMax: z.array(z.number().positive()).min(1),
+        /** Optional: the 유지 구간 (a balance stored before it existed uses the game's defaults). */
+        zone: z
+          .object({
+            wide: z.number().min(0.05).max(0.8),
+            narrow: z.number().min(0.03).max(0.8),
+            center: z.number().min(0.2).max(0.8),
+            bossMult: z.number().positive(),
+            sway: z.number().min(0).max(0.3),
+            tiredWiden: z.number().min(0),
+            lineWiden: z.number().min(0),
+            yank: z.number().min(0),
+            slackLoss: z.number().min(0),
+            reelIn: z.number().positive(),
+          })
+          .partial()
+          .strict()
+          .optional(),
       })
       .strict(),
     boat: z

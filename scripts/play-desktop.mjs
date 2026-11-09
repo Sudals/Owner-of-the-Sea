@@ -33,10 +33,12 @@ async function launch() {
   await page.waitForTimeout(700);
   return { app, page };
 }
+/** Where to aim inside the 유지 구간 (k = 0 its bottom … 1 its top). */
+const zoneAt = (s, k) => (s.zone ? s.zone[0] + (s.zone[1] - s.zone[0]) * k : k < 0.5 ? 0.6 : 0.8);
 const scene = (page) =>
   page.evaluate(() => {
     const sea = window.__sea, s = sea.engine.currentScene, st = s.state;
-    return { k: st.k, modal: sea.engine.modal?.opts.title ?? null, tension: st.reel?.tension ?? null, status: sea.backend.saveStatus?.() ?? null };
+    return { k: st.k, modal: sea.engine.modal?.opts.title ?? null, tension: st.reel?.tension ?? null, zone: st.reel?.zone ?? null, status: sea.backend.saveStatus?.() ?? null };
   });
 const waitFor = async (page, pred, timeout = 20_000, label = "") => {
   const t0 = Date.now();
@@ -65,8 +67,8 @@ async function fishOnce(page) {
     const s = await scene(page);
     if (s.k !== "reeling" && s.k !== "bite") break;
     if (s.k === "reeling") {
-      if (!holding && s.tension < 0.6) { await page.keyboard.down("Space"); holding = true; }
-      else if (holding && s.tension > 0.8) { await page.keyboard.up("Space"); holding = false; }
+      if (!holding && s.tension < zoneAt(s, 0.4)) { await page.keyboard.down("Space"); holding = true; }
+      else if (holding && s.tension > zoneAt(s, 0.6)) { await page.keyboard.up("Space"); holding = false; }
     }
     await page.waitForTimeout(20);
   }

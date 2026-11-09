@@ -1,6 +1,6 @@
 // M3 check: play the fishing loop with the keyboard like a player would.
 //   node scripts/play-m3.mjs [baseUrl] [outDir]
-// cast → wait for the bite → strike → reel (hold under 60% tension, release over 80%) → result.
+// cast → wait for the bite → strike → reel (keep the tension in the middle of the 유지 구간) → result.
 // Also: miss a bite on purpose, and reload mid-session to confirm the seed + cast index resume.
 import { mkdirSync } from "node:fs";
 import { chromium } from "playwright";
@@ -15,13 +15,15 @@ const errors = [];
 page.on("console", (m) => m.type() === "error" && errors.push(`console: ${m.text()}`));
 page.on("pageerror", (e) => errors.push(`pageerror: ${e.message}`));
 
+/** Where to aim inside the 유지 구간 (k = 0 its bottom … 1 its top). */
+const zoneAt = (s, k) => (s.zone ? s.zone[0] + (s.zone[1] - s.zone[0]) * k : k < 0.5 ? 0.6 : 0.8);
 const scene = () =>
   page.evaluate(() => {
     const s = window.__sea.engine.currentScene;
     const st = s.state;
     return {
       k: st.k,
-      tension: st.reel?.tension ?? null,
+      tension: st.reel?.tension ?? null, zone: st.reel?.zone ?? null,
       dist: st.reel?.dist ?? null,
       fish: st.hooked?.fish?.name ?? null,
       size: st.hooked?.roll?.sizeCm ?? null,
@@ -69,8 +71,8 @@ async function fishOnce(n, { strike = true } = {}) {
   for (;;) {
     const s = await scene();
     if (s.k !== "reeling") break;
-    if (!holding && s.tension < 0.6) { await page.keyboard.down("Space"); holding = true; }
-    else if (holding && s.tension > 0.8) { await page.keyboard.up("Space"); holding = false; }
+    if (!holding && s.tension < zoneAt(s, 0.4)) { await page.keyboard.down("Space"); holding = true; }
+    else if (holding && s.tension > zoneAt(s, 0.6)) { await page.keyboard.up("Space"); holding = false; }
     if (!shotTaken && Date.now() - t0 > 1500) { await shot(`m3-reeling-${n}`); shotTaken = true; }
     await page.waitForTimeout(20);
   }

@@ -31,6 +31,8 @@ page.on("request", (r) => {
   if (u.startsWith(API) && r.method() !== "OPTIONS") calls.push(`${r.method()} ${u.slice(API.length)}`);
 });
 
+/** Where to aim inside the 유지 구간 (k = 0 its bottom … 1 its top). */
+const zoneAt = (s, k) => (s.zone ? s.zone[0] + (s.zone[1] - s.zone[0]) * k : k < 0.5 ? 0.6 : 0.8);
 const scene = () =>
   page.evaluate(() => {
     const sea = window.__sea;
@@ -41,7 +43,7 @@ const scene = () =>
       k: st.k,
       modal: sea.engine.modal ? sea.engine.modal.opts.title : null,
       flash: sea.game.flashMsg?.text ?? null,
-      tension: st.reel?.tension ?? null,
+      tension: st.reel?.tension ?? null, zone: st.reel?.zone ?? null,
       roll: st.hooked ? { i: st.hooked.i, fishId: st.hooked.roll.fishId, sizeCm: st.hooked.roll.sizeCm } : null,
       session: s.session ? { id: s.session.sessionId, next: s.session.nextIndex } : null,
       status: sea.backend.saveStatus?.() ?? null,
@@ -70,7 +72,7 @@ const api = async (method, path, body, tok) => {
   return { status: res.status, json: await res.json().catch(() => null) };
 };
 
-/** One cast like a player: hold to cast, strike the bite, reel under 60–80% tension. */
+/** One cast like a player: hold to cast, strike the bite, keep the tension inside the 유지 구간. */
 async function fishOnce() {
   await waitFor((s) => s.k === "idle", 15_000, "idle");
   await page.keyboard.down("Space");
@@ -84,8 +86,8 @@ async function fishOnce() {
   for (;;) {
     const s = await scene();
     if (s.k !== "reeling") break;
-    if (!holding && s.tension < 0.6) { await page.keyboard.down("Space"); holding = true; }
-    else if (holding && s.tension > 0.8) { await page.keyboard.up("Space"); holding = false; }
+    if (!holding && s.tension < zoneAt(s, 0.4)) { await page.keyboard.down("Space"); holding = true; }
+    else if (holding && s.tension > zoneAt(s, 0.6)) { await page.keyboard.up("Space"); holding = false; }
     await page.waitForTimeout(20);
   }
   if (holding) await page.keyboard.up("Space");

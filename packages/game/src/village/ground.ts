@@ -7,6 +7,8 @@ import type { Ground, VillageDef } from "./maps";
 // with a front face, a shadow on the water and rope railings where they meet it.
 // Two foam rings along the shore are returned separately — the scene fades them in turn so
 // the water laps at the land. Day colors; time of day is a tint on top.
+// A margin of open sea can be baked around the map (a wide view shows past the map's edges);
+// the map itself comes out the same whatever the margin.
 
 export const TL = 16;
 
@@ -87,10 +89,15 @@ function texel(t: Ground, x: number, y: number): Col {
 /** Darker shade a land texel takes right at the shore (a bevel). */
 const EDGE: Partial<Record<Ground, Col>> = { ".": "green1", ",": "green1", s: "sand1", ":": "wood", r: "gray1", w: "foam1", o: "gray1" };
 
-export type BakedGround = { ground: HTMLCanvasElement; foamIn: HTMLCanvasElement; foamOut: HTMLCanvasElement };
+/** `ox`, `oy`: where the map's top-left sits in the canvases (the margin, px); `mx`, `my` the
+ *  margin in tiles. */
+export type BakedGround = { ground: HTMLCanvasElement; foamIn: HTMLCanvasElement; foamOut: HTMLCanvasElement; ox: number; oy: number; mx: number; my: number };
 
-export function bakeGround(def: VillageDef): BakedGround {
-  const W = def.w, H = def.h, Wp = W * TL, Hp = H * TL;
+/** A modulo that stays positive for negative x (the margin left of / above the map). */
+const pmod = (x: number, m: number) => ((x % m) + m) % m;
+
+export function bakeGround(def: VillageDef, mx = 0, my = 0): BakedGround {
+  const W = def.w, H = def.h, ox = mx * TL, oy = my * TL, Wp = W * TL + 2 * ox, Hp = H * TL + 2 * oy;
   const tile = (tx: number, ty: number): Ground => def.ground[ty]?.[tx] ?? "~";
   const tileAt = (px: number, py: number): Ground => tile(Math.floor(px / TL), Math.floor(py / TL));
 
@@ -150,8 +157,10 @@ export function bakeGround(def: VillageDef): BakedGround {
     data[i + 3] = a;
   };
 
-  for (let y = 0; y < Hp; y++)
-    for (let x = 0; x < Wp; x++) {
+  for (let cy = 0; cy < Hp; cy++)
+    for (let cx = 0; cx < Wp; cx++) {
+      // map pixel (negative / past the map in the margin: open water)
+      const x = cx - ox, y = cy - oy;
       const own = tileAt(x, y);
       const f = field(land, x, y) + (hash(x >> 1, y >> 1, 31) - 0.5) * 0.14;
       let c: Col;
@@ -166,20 +175,20 @@ export function bakeGround(def: VillageDef): BakedGround {
         const ramp: Col[] = ["jade2", "jade3", "foam1"];
         const k = Math.floor(p);
         c = bayer(x, y) < p - k ? ramp[Math.min(2, k + 1)]! : ramp[k]!;
-        if (shallow < 0.3 && y % 7 === 0 && (x + Math.floor(y / 7) * 9) % 13 < 3) c = "foam1"; // still wave streaks
+        if (shallow < 0.3 && pmod(y, 7) === 0 && pmod(x + Math.floor(y / 7) * 9, 13) < 3) c = "foam1"; // still wave streaks
         if (f >= 0.45) c = bayer(x, y) < 0.7 ? "white" : "foam2";
-        else if (f >= 0.41) put(inner.data, x, y, "white", 230);
-        else if (f >= 0.33 && f < 0.36) put(outer.data, x, y, bayer(x, y) < 0.5 ? "white" : "foam2", 200);
+        else if (f >= 0.41) put(inner.data, cx, cy, "white", 230);
+        else if (f >= 0.33 && f < 0.36) put(outer.data, cx, cy, bayer(x, y) < 0.5 ? "white" : "foam2", 200);
         const up = tileAt(x, y - 1), up2 = tileAt(x, y - 2), up3 = tileAt(x, y - 3);
         if (isDeck(up)) c = "jade1";
         else if (isDeck(up2) || isDeck(up3)) c = bayer(x, y) < 0.6 ? "jade2" : c;
       }
-      put(d, x, y, c);
+      put(d, cx, cy, c);
     }
   g.putImageData(img, 0, 0);
   fi.putImageData(inner, 0, 0);
   fo.putImageData(outer, 0, 0);
-  return { ground, foamIn, foamOut };
+  return { ground, foamIn, foamOut, ox, oy, mx, my };
 }
 
 /** A deck or log raft pixel: its texture, a front face and side rims at the water, rope railings

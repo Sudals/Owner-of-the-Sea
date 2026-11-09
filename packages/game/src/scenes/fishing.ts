@@ -288,6 +288,10 @@ export class FishingScene implements Scene {
         if (s.reel.thrash > 0 && this.sprayT > 0.09) {
           this.sprayT = 0;
           this.splash(s.fishPos[0], 3, 0.7);
+        } else if (s.reel.inZone && this.sprayT > 0.32) {
+          // coming in: a small wake at the line
+          this.sprayT = 0;
+          this.fx.ring(s.fishPos[0], this.waterline + 1, "white", 6, 0.4, 0.2);
         }
         this.fx.danger = Math.max(0, Math.min(1, (s.reel.tension - 0.82) / 0.15));
         const out = s.reel.outcome;
@@ -655,16 +659,23 @@ export class FishingScene implements Scene {
 
     if (s.k === "reeling") {
       const r = s.reel;
-      const x = 220, y = 8, w = 200;
-      panel(ctx, assets, "panel_sea", x, y, w, 52);
+      const x = 200, y = 8, w = 240;
+      panel(ctx, assets, "panel_sea", x, y, w, 56);
       text(ctx, s.hooked.fish.rarity === "boss" ? `오염체! ${s.hooked.fish.name}` : "텐션", x + 10, y + 7, { maxW: w - 70 });
       text(ctx, `${Math.max(0, r.dist).toFixed(1)}m`, x + w - 10, y + 7, { align: "right", color: lutHex("foam1") });
-      const tc = r.tension > 0.8 ? lutHex("coral") : r.tension > 0.6 ? lutHex("yellow") : lutHex("jade3");
-      gaugeH(ctx, assets, x + 10, y + 22, w - 20, r.tension, tc, [0.6, 0.8]);
-      gaugeH(ctx, assets, x + 10, y + 34, w - 20, r.progress, lutHex("sea3"));
+      this.drawTension(ctx, x + 10, y + 24, w - 20, r);
+      // the catch gauge fills only while the tension stays in the zone
+      gaugeH(ctx, assets, x + 10, y + 40, w - 20, r.progress, r.inZone ? lutHex("sea3") : lutHex("gray2"));
       const blink = Math.floor(this.t * 6) % 2 === 0;
-      if (r.tension > 0.85 && blink) text(ctx, "줄이 끊어질 것 같다! 손을 떼!", 320, y + 58, { align: "center", color: lutHex("coral") });
-      else if (r.slack > 0.4 && blink) text(ctx, "줄이 느슨하다! 감아!", 320, y + 58, { align: "center", color: lutHex("yellow") });
+      const [lo, hi] = r.zone;
+      const hint: [string, Parameters<typeof lutHex>[0]] | null =
+        r.tension > Math.max(hi, 0.85) ? (blink ? ["줄이 끊어질 것 같다! 손을 떼!", "coral"] : null)
+        : r.slack > 0.4 ? (blink ? ["줄이 느슨하다! 감아!", "yellow"] : null)
+        : s.t < 3 ? ["초록 구간 안에 텐션을 맞춰야 끌려온다", "foam2"]
+        : r.tension > hi ? ["너무 세다 — 살짝 놓아", "foam2"]
+        : r.tension < lo ? ["느슨하다 — 구간까지 감아", "foam2"]
+        : null;
+      if (hint) text(ctx, hint[0], 320, y + 62, { align: "center", color: lutHex(hint[1]) });
     }
 
     if (s.k === "caught") this.drawResultCard(ctx, s.hooked, s.t);
@@ -707,6 +718,33 @@ export class FishingScene implements Scene {
       const line = `${this.clock.label()} ${lut} · ${this.spot.kind === "dock" ? "선착장" : `배 위 (${this.spot.sea})`} · ${s.k} · ${engine.fps}fps  [T]+1h [B]장소 [N]바다`;
       text(ctx, line, 4, 4);
     }
+  }
+
+  /** The tension gauge: the 유지 구간 (green, bright while the needle is in it), the breaking end
+   *  (red) and the needle. */
+  private drawTension(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, r: Reel): void {
+    const h = 10, inner = w - 2;
+    const px = (v: number) => x + 1 + Math.round(inner * Math.max(0, Math.min(1, v)));
+    ctx.fillStyle = lutHex("ink");
+    ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = lutHex("navy");
+    ctx.fillRect(x + 1, y + 1, w - 2, h - 2);
+    ctx.globalAlpha = 0.6;
+    ctx.fillStyle = lutHex("red2");
+    ctx.fillRect(px(0.9), y + 1, px(1) - px(0.9), h - 2);
+    ctx.globalAlpha = 1;
+    const [lo, hi] = r.zone;
+    const zx = px(lo), zw = Math.max(3, px(hi) - zx);
+    ctx.fillStyle = lutHex(r.inZone ? "jade3" : "jade2");
+    ctx.fillRect(zx, y + 1, zw, h - 2);
+    ctx.fillStyle = lutHex(r.inZone && Math.floor(this.t * 8) % 2 === 0 ? "white" : "foam1");
+    ctx.fillRect(zx, y + 1, 1, h - 2);
+    ctx.fillRect(zx + zw - 1, y + 1, 1, h - 2);
+    const nx = px(r.tension);
+    ctx.fillStyle = lutHex("ink");
+    ctx.fillRect(nx - 2, y - 3, 5, h + 6);
+    ctx.fillStyle = lutHex(r.inZone ? "white" : r.tension > hi ? "coral" : "yellow");
+    ctx.fillRect(nx - 1, y - 2, 3, h + 4);
   }
 
   private drawResultCard(ctx: CanvasRenderingContext2D, h: Hooked, t: number): void {

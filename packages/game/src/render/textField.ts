@@ -58,19 +58,20 @@ export class TextField {
   /** Lay the element over view rect (x, y, w, h) — called every render, so resizes just work. */
   place(x: number, y: number, w: number, h: number): void {
     const b = this.box;
-    const r = this.engine.screen.getBoundingClientRect();
-    if (b.x === x && b.y === y && b.w === w && b.h === h && this.el.dataset.rw === String(r.width) && this.el.dataset.rl === `${r.left},${r.top}`) return;
+    // where the game sits in the window (it can be smaller than the canvas, or scaled by any factor)
+    const p = this.engine.toPage(x, y);
+    const key = `${p.x},${p.y},${p.k}`;
+    if (b.x === x && b.y === y && b.w === w && b.h === h && this.el.dataset.at === key) return;
     this.box = { x, y, w, h };
-    const k = r.width / 640;
+    const k = p.k;
     Object.assign(this.el.style, {
-      left: `${r.left + x * k}px`,
-      top: `${r.top + y * k}px`,
+      left: `${p.x}px`,
+      top: `${p.y}px`,
       width: `${w * k}px`,
       height: `${h * k}px`,
       fontSize: `${12 * k}px`,
     });
-    this.el.dataset.rw = String(r.width);
-    this.el.dataset.rl = `${r.left},${r.top}`;
+    this.el.dataset.at = key;
   }
 
   destroy(): void {

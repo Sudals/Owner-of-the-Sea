@@ -39,7 +39,7 @@ const view = () =>
       world: { hullHp: game.world.hullHp, fuel: game.world.fuel, holdLv: game.world.holdLv, tankLv: game.world.tankLv },
       log: backend.marketLog(),
       toast: s.toast?.text ?? null,
-      tension: st.reel?.tension ?? null,
+      tension: st.reel?.tension ?? null, zone: st.reel?.zone ?? null,
       prompt: st.prompt ?? null,
       modal: engine.modal?.opts.title ?? null,
     };
@@ -79,6 +79,8 @@ const leaveVillage = async () => {
   await waitFor((s) => s.k === "island", 5000, "back at the dock");
 };
 
+/** Where to aim inside the 유지 구간 (k = 0 its bottom … 1 its top). */
+const zoneAt = (s, k) => (s.zone ? s.zone[0] + (s.zone[1] - s.zone[0]) * k : k < 0.5 ? 0.6 : 0.8);
 async function cast() {
   await waitFor((s) => s.k === "idle", 15_000, "idle");
   await page.keyboard.down("Space");
@@ -86,7 +88,7 @@ async function cast() {
   await page.keyboard.up("Space");
   await waitFor((s) => s.k === "waiting", 5000, "waiting");
 }
-/** Strike and reel like a player (hold under 60% tension, let go over 80%). */
+/** Strike and reel like a player (keep the tension inside the 유지 구간). */
 async function reel() {
   await page.keyboard.press("Space");
   await waitFor((s) => s.k === "reeling", 5000, "reeling");
@@ -94,8 +96,8 @@ async function reel() {
   for (;;) {
     const s = await view();
     if (s.k !== "reeling") break;
-    if (!holding && s.tension < 0.6) { await page.keyboard.down("Space"); holding = true; }
-    else if (holding && s.tension > 0.8) { await page.keyboard.up("Space"); holding = false; }
+    if (!holding && s.tension < zoneAt(s, 0.4)) { await page.keyboard.down("Space"); holding = true; }
+    else if (holding && s.tension > zoneAt(s, 0.6)) { await page.keyboard.up("Space"); holding = false; }
     await page.waitForTimeout(20);
   }
   if (holding) await page.keyboard.up("Space");

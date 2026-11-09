@@ -158,25 +158,28 @@ export class Fx {
     ctx.globalAlpha = 1;
   }
 
-  /** The screen flash and the danger glow, over the whole 640×360 view. */
+  /** The screen flash and the danger glow, over the whole view (however large). */
   drawScreen(ctx: CanvasRenderingContext2D): void {
     const glow = this.danger > 0 ? this.danger * (0.5 + 0.5 * Math.sin(this.t * 9)) * 0.35 : 0;
     const a = Math.max(this.flashA, glow);
     if (a <= 0.01) return;
     const color = this.flashA >= glow ? this.flashColor : "red2";
+    const W = ctx.canvas.width, H = ctx.canvas.height;
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = lutHex(color);
     // light over the middle, strongest at the edges (a vignette, so the action stays visible)
     ctx.globalAlpha = a * 0.35;
-    ctx.fillRect(0, 0, 640, 360);
+    ctx.fillRect(0, 0, W, H);
     for (let i = 0; i < 5; i++) {
       ctx.globalAlpha = Math.min(1, a * (0.9 - i * 0.16));
       const e = 4 + i * 7;
-      ctx.fillRect(0, 0, 640, e);
-      ctx.fillRect(0, 360 - e, 640, e);
-      ctx.fillRect(0, e, e, 360 - 2 * e);
-      ctx.fillRect(640 - e, e, e, 360 - 2 * e);
+      ctx.fillRect(0, 0, W, e);
+      ctx.fillRect(0, H - e, W, e);
+      ctx.fillRect(0, e, e, H - 2 * e);
+      ctx.fillRect(W - e, e, e, H - 2 * e);
     }
-    ctx.globalAlpha = 1;
+    ctx.restore();
   }
 }
 

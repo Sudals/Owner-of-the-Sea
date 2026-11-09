@@ -124,12 +124,14 @@ export function button(ctx: CanvasRenderingContext2D, assets: Assets, state: But
   text(ctx, label, x + w / 2, y + Math.round((h - 12) / 2) + (state === "pressed" ? 1 : 0), { align: "center", color, shadow: null, maxW: w - 8 });
 }
 
-/** Darken the whole view (behind dialogs). */
+/** Darken the whole view (behind dialogs), however large and wherever the layout sits. */
 export function dim(ctx: CanvasRenderingContext2D, alpha = 0.55): void {
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.globalAlpha = alpha;
   ctx.fillStyle = lutHex("ink");
-  ctx.fillRect(0, 0, 640, 360);
-  ctx.globalAlpha = 1;
+  ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  ctx.restore();
 }
 
 /** Is view point p inside rect r? */

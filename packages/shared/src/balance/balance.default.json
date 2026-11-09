@@ -876,7 +876,19 @@
    1.4,
    1.65,
    1.9
-  ]
+  ],
+  "zone": {
+   "wide": 0.42,
+   "narrow": 0.13,
+   "center": 0.52,
+   "bossMult": 0.85,
+   "sway": 0.1,
+   "tiredWiden": 0.25,
+   "lineWiden": 0.35,
+   "yank": 0.35,
+   "slackLoss": 0.8,
+   "reelIn": 0.75
+  }
  },
  "boat": {
   "hulls": {
