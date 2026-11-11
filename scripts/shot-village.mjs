@@ -39,6 +39,23 @@ for (const id of ["red_lighthouse", "water_market", "salt_flower", "bell_tower"]
   });
   if (stuck.length) errors.push(`${id}: can't walk to ${stuck.join(", ")}`);
   else console.log(`${id}: all ${await page.evaluate(() => window.__sea.engine.currentScene.pois.length)} spots reachable`);
+  // you trade from anywhere along the front of a counter; keepers of shops and sheds are inside
+  const zones = await page.evaluate(() => {
+    const s = window.__sea.engine.currentScene, bad = [];
+    for (const p of s.pois) {
+      for (const [x, y] of s.zone(p)) {
+        s.warpTo(p);
+        s.pc.x = (x + 0.5) * 16;
+        s.pc.y = y * 16 + 13;
+        if (s.state.prompt !== p.id) bad.push(`${p.id} at ${x},${y} → ${s.state.prompt}`);
+      }
+      if ((p.w ?? 1) > 1 && s.zone(p).length < 2) bad.push(`${p.id}: zone ${s.zone(p).length} tile`);
+    }
+    for (const w of s.walkers) if (w.def.inside && !w.home) bad.push(`${w.def.id} isn't inside a building`);
+    return bad;
+  });
+  if (zones.length) errors.push(`${id}: ${zones.join(" · ")}`);
+  else console.log(`${id}: every counter answers along its whole front; keepers inside`);
   // walk up the path a little so the camera shows the middle of the village
   await page.keyboard.down("ArrowUp");
   await page.waitForTimeout(900);

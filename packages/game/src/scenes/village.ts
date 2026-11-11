@@ -9,7 +9,7 @@ import { InventoryPanel } from "../ui/inventoryPanel";
 import { Modal } from "../ui/modal";
 import { BIG, MarketPanel, ShopPanel, Trader } from "../ui/trade";
 import { bakeGround, TL, type BakedGround } from "../village/ground";
-import { villageOf, type Facing, type Npc, type Poi, type Prop, type Service, type VillageDef } from "../village/maps";
+import { KEEPERS, villageOf, type Facing, type Npc, type Poi, type Prop, type Service, type VillageDef } from "../village/maps";
 
 // 마을 (design §3-1; Economy.md §5): the village of an island, top-down. You walk it (arrows /
 // WASD / click), and the market, shops, fuel, repairs and 덕배 할멈's worms are people and places
@@ -19,7 +19,9 @@ const SPEED = 70; // px/s
 const NPC_SPEED = 28;
 const PROMPT_W = 280;
 
-type Walker = { def: Npc; x: number; y: number; dir: Facing; wp: number; wait: number; moving: boolean; t: number; lookT: number; hop: number };
+/** `home`: a keeper inside a building — drawn right after it, clipped to its opening (world px).
+ *  `roof`: the top of the building or stall a keeper works in (their name shows above it). */
+type Walker = { def: Npc; x: number; y: number; dir: Facing; wp: number; wait: number; moving: boolean; t: number; lookT: number; hop: number; home?: { bottom: number; clip: [number, number, number, number] }; roof?: number };
 type Puff = { x: number; y: number; vx: number; t: number; life: number };
 /** A gull: sitting on its perch, or flying (z = height) — circling, or coming back to land. */
 type Gull = { x: number; y: number; z: number; perch: [number, number] | null; mode: "sit" | "circle" | "land"; a: number; r: number; speed: number; back: number; flip: boolean };
@@ -39,6 +41,11 @@ const SERVICE_LABEL: Record<Service, string> = {
 const tileOf = (px: number, py: number): [number, number] => [Math.floor(px / TL), Math.floor((py - 2) / TL)];
 /** Where a walker's feet stand on a tile. */
 const feetAt = (tx: number, ty: number): [number, number] => [(tx + 0.5) * TL, ty * TL + 13];
+/** The tiles of a spot's zone: the whole front of a counter (w tiles, centered on the spot). */
+const zoneOf = (p: Poi): [number, number][] => {
+  const half = ((p.w ?? 1) - 1) >> 1;
+  return Array.from({ length: half * 2 + 1 }, (_, i) => [p.x - half + i, p.y]);
+};
 
 export class VillageScene implements Scene {
   /** Top-down: a wider window shows more of the village and the sea around it (engine.ts). */
@@ -130,7 +137,43 @@ export class VillageScene implements Scene {
   enter(engine: Engine): void {
     this.engine = engine;
     this.bake();
+    this.placeKeepers();
     this.game.save();
+  }
+
+  /** Keepers who work inside a shop or a shed stand in its opening (KEEPERS), seen through it. */
+  private placeKeepers(): void {
+    const assets = this.engine.assets;
+    for (const w of this.walkers) {
+      // anyone working in a building or behind a stall: their name goes above its roof
+      const at = this.def.props.find((p) => footTiles(p).some(([x, y]) => x === w.def.x && y === w.def.y));
+      if (at && !w.def.walk && assets.has("town", at.sprite)) w.roof = anchorOf(at)[1] - assets.frame("town", at.sprite).h;
+      if (!w.def.inside) continue;
+      const prop = this.def.props.find((p) => KEEPERS[p.sprite] && footTiles(p).some(([x, y]) => x === w.def.x && y === w.def.y));
+      if (!prop || !assets.has("town", prop.sprite)) continue;
+      const k = KEEPERS[prop.sprite]!, f = assets.frame("town", prop.sprite);
+      const [cx, bottom] = anchorOf(prop);
+      const left = Math.round(cx - f.w / 2), top = bottom - f.h;
+      w.x = left + k.feet[0];
+      w.y = top + k.feet[1];
+      w.home = { bottom, clip: [left + k.clip[0], top + k.clip[1], k.clip[2], k.clip[3]] };
+    }
+  }
+
+  /** A spot's zone without the tiles you can't stand on (water, a crate): the run around its middle. */
+  private zone(p: Poi): [number, number][] {
+    const z = zoneOf(p), mid = z.length >> 1;
+    const free = ([x, y]: [number, number]) => !this.solid[y * this.def.w + x];
+    let a = mid, b = mid;
+    while (a > 0 && free(z[a - 1]!)) a--;
+    while (b < z.length - 1 && free(z[b + 1]!)) b++;
+    return z.slice(a, b + 1);
+  }
+
+  /** Turn a villager toward a point — a keeper behind a counter never turns their back on you. */
+  private face(w: Walker, x: number, y: number): void {
+    const d = faceToward(w.x, w.y, x, y);
+    w.dir = w.home && d === "up" ? w.def.dir : d;
   }
 
   /** Bake the ground with as much sea around the map as the view needs (again if the window
@@ -178,7 +221,7 @@ export class VillageScene implements Scene {
     if (tx < 0 || ty < 0 || tx >= this.def.w || ty >= this.def.h) return true;
     if (this.solid[ty * this.def.w + tx]) return true;
     for (const w of this.walkers) {
-      if (w === ignore) continue;
+      if (w === ignore || w.home) continue;
       const [wx, wy] = tileOf(w.x, w.y);
       if (wx === tx && wy === ty) return true;
     }
@@ -194,13 +237,25 @@ export class VillageScene implements Scene {
     return false;
   }
 
-  /** The spot you're standing at, if any. */
+  /** The spot whose zone you're standing in (anywhere along the front of a counter), if any. */
   private near(): Poi | null {
-    let best: Poi | null = null, bd = 13;
+    let best: Poi | null = null, bd = Infinity;
     for (const p of this.pois) {
-      const [px, py] = feetAt(p.x, p.y);
-      const d = Math.hypot(this.pc.x - px, this.pc.y - py);
+      const z = this.zone(p);
+      const x0 = z[0]![0] * TL - 2, x1 = (z.at(-1)![0] + 1) * TL + 2, fy = feetAt(p.x, p.y)[1];
+      if (this.pc.x < x0 || this.pc.x > x1 || Math.abs(this.pc.y - fy) > 8) continue;
+      const d = Math.abs(this.pc.x - (p.x + 0.5) * TL) + Math.abs(this.pc.y - fy);
       if (d < bd) (bd = d), (best = p);
+    }
+    return best;
+  }
+
+  /** The shortest walk to any tile of a spot's zone. */
+  private routeTo(p: Poi): [number, number][] | null {
+    let best: [number, number][] | null = null;
+    for (const [x, y] of this.zone(p)) {
+      const r = this.findRoute(x, y);
+      if (r && (!best || r.length < best.length)) best = r;
     }
     return best;
   }
@@ -237,8 +292,8 @@ export class VillageScene implements Scene {
     this.route = [];
     this.goingTo = null;
     const npc = p.npc ? this.walkers.find((w) => w.def.id === p.npc) : null;
-    if (npc) npc.dir = faceToward(npc.x, npc.y, this.pc.x, this.pc.y);
-    this.pc.dir = npc ? faceToward(this.pc.x, this.pc.y, npc.x, npc.y) : "up";
+    if (npc) this.face(npc, this.pc.x, this.pc.y);
+    this.pc.dir = npc && !npc.home ? faceToward(this.pc.x, this.pc.y, npc.x, npc.y) : "up";
     const m = this.market;
     const services = p.services.filter((s) => this.offers(s, m));
     if (services.length === 1) return this.run(services[0]!, p);
@@ -344,7 +399,7 @@ export class VillageScene implements Scene {
       const wx = this.cam.x + engine.safe.x + c.x, wy = this.cam.y + engine.safe.y + c.y;
       const target = this.poiAt(wx, wy);
       if (target) {
-        const r = this.findRoute(target.x, target.y);
+        const r = this.routeTo(target);
         if (r) {
           this.route = r;
           this.goingTo = target;
@@ -425,13 +480,15 @@ export class VillageScene implements Scene {
     return best;
   }
 
-  /** The person or place under a world point (an NPC's body, or the thing a spot stands in front of). */
+  /** The person or place under a world point (an NPC's body, or the thing a spot stands in front
+   *  of: its zone and the building above it). */
   private poiAt(wx: number, wy: number): Poi | null {
+    const tx = Math.floor(wx / TL), ty = Math.floor(wy / TL);
     for (const p of this.pois) {
       const npc = p.npc ? this.walkers.find((w) => w.def.id === p.npc) : null;
       if (npc && Math.abs(wx - npc.x) <= 8 && wy >= npc.y - 24 && wy <= npc.y) return p;
-      const tx = Math.floor(wx / TL), ty = Math.floor(wy / TL);
-      if (tx === p.x && ty <= p.y && ty >= p.y - 2) return p;
+      const z = this.zone(p);
+      if (tx >= z[0]![0] && tx <= z.at(-1)![0] && ty <= p.y && ty >= p.y - 3) return p;
     }
     return null;
   }
@@ -443,7 +500,7 @@ export class VillageScene implements Scene {
       const path = w.def.walk;
       if (!path || path.length < 2) {
         // people who stay put look about now and then, and turn to you when you come close
-        if (Math.hypot(w.x - this.pc.x, w.y - this.pc.y) < 2.4 * TL) w.dir = faceToward(w.x, w.y, this.pc.x, this.pc.y);
+        if (Math.hypot(w.x - this.pc.x, w.y - this.pc.y) < 2.4 * TL) this.face(w, this.pc.x, this.pc.y);
         else if ((w.lookT -= dt) <= 0) {
           const looking = w.dir !== w.def.dir;
           w.dir = looking ? w.def.dir : (["left", "right", "down"] as Facing[])[Math.floor((w.t * 7) % 3)]!;
@@ -581,10 +638,25 @@ export class VillageScene implements Scene {
       list.push({ y: bottom, draw: () => assets.draw(ctx, "town", name, Math.round(cx - f.w / 2 - cam.x), Math.round(bottom - f.h - cam.y) + bob) });
     }
     for (const w of this.walkers) {
+      const hop = w.hop > 0 ? Math.round(Math.abs(Math.sin((w.hop / 0.3) * Math.PI)) * 3) : 0;
+      if (w.home) {
+        const h = w.home;
+        list.push({
+          y: h.bottom + 0.5,
+          draw: () => {
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(h.clip[0] - cam.x, h.clip[1] - cam.y, h.clip[2], h.clip[3]);
+            ctx.clip();
+            this.drawPerson(ctx, w.def.look, w.x, w.y - hop, w.dir, 0, cam);
+            ctx.restore();
+          },
+        });
+        continue;
+      }
       // a keeper behind a counter stands on a crate, so even the children show over it
       const [tx, ty] = tileOf(w.x, w.y);
       const lift = this.solid[ty * this.def.w + tx] ? 4 : 0;
-      const hop = w.hop > 0 ? Math.round(Math.abs(Math.sin((w.hop / 0.3) * Math.PI)) * 3) : 0;
       list.push({ y: w.y, draw: () => this.drawPerson(ctx, w.def.look, w.x, w.y - lift - hop, w.dir, w.moving ? w.t : 0, cam) });
     }
     list.push({ y: this.pc.y, draw: () => this.drawPerson(ctx, "pc", this.pc.x, this.pc.y, this.pc.dir, this.pc.moving ? this.pc.t : 0, cam) });
@@ -771,7 +843,18 @@ export class VillageScene implements Scene {
         ctx.fillRect(x, y + 2, 1, 1);
       }
     }
-    if (here) {
+    // where you can trade: the front of the counter shows when you come close, glows when you're in it
+    for (const p of this.pois) {
+      if (p.services[0] === "talk" || p.services[0] === "leave") continue;
+      const z = this.zone(p), fy = feetAt(p.x, p.y)[1];
+      const x0 = z[0]![0] * TL, w = z.length * TL;
+      if (p !== here && Math.hypot(this.pc.x - (x0 + w / 2), this.pc.y - fy) > 3.5 * TL) continue;
+      ctx.strokeStyle = lutHex(p === here ? "yellow" : "white");
+      ctx.globalAlpha = p === here ? 0.6 + Math.sin(this.t * 6) * 0.3 : 0.28;
+      ctx.strokeRect(Math.round(x0 + 1 - cam.x) + 0.5, Math.round(fy - 10 - cam.y) + 0.5, w - 3, 11);
+      ctx.globalAlpha = 1;
+    }
+    if (here && (here.services[0] === "talk" || here.services[0] === "leave")) {
       const [fx, fy] = feetAt(here.x, here.y);
       ctx.strokeStyle = lutHex("yellow");
       ctx.globalAlpha = 0.6 + Math.sin(this.t * 6) * 0.3;
@@ -808,13 +891,17 @@ export class VillageScene implements Scene {
         if (d < bd) (bd = d), (who = w);
       }
     }
-    if (who && this.bubble?.npc !== who.def.id) text(ctx, who.def.name, who.x - cam.x, who.y - 36 - cam.y, { align: "center", color: lutHex("white") });
+    if (who && this.bubble?.npc !== who.def.id) {
+      const ty = who.roof !== undefined ? Math.min(who.y - 36, who.roof - 15) : who.y - 36;
+      text(ctx, who.def.name, who.x - cam.x, ty - cam.y, { align: "center", color: lutHex("white") });
+    }
     if (this.bubble) {
       const w = this.walkers.find((x) => x.def.id === this.bubble!.npc);
       if (w) {
         const s = this.bubble.text;
         const bw = Math.min(300, textWidth(ctx, s) + 16);
-        const x = Math.round(Math.max(4, Math.min(this.vw - bw - 4, w.x - cam.x - bw / 2))), y = Math.round(w.y - 66 - cam.y);
+        const top = w.roof !== undefined ? Math.min(w.y - 66, w.roof - 26) : w.y - 66;
+        const x = Math.round(Math.max(4, Math.min(this.vw - bw - 4, w.x - cam.x - bw / 2))), y = Math.round(top - cam.y);
         panel(ctx, this.engine.assets, "panel_paper", x, y, bw, 22);
         text(ctx, s, x + bw / 2, y + 5, { align: "center", color: lutHex("ink"), shadow: null, maxW: bw - 12 });
       }

@@ -514,37 +514,82 @@ const SHOP_SIGNS = {
     disc(img, x + 5, y + 1, 1.4, C.gray2);
     img.set(x + 5, y + 1, 0);
   },
+  fish: (img: Img, x: number, y: number) => {
+    ellipse(img, x + 2.5, y + 4, 2.6, 1.5, C.sea2);
+    img.set(x + 5, y + 3, C.sea2);
+    img.set(x + 5, y + 5, C.sea2);
+    img.set(x + 1, y + 4, C.ink);
+  },
 };
 
-function shop(roof: [number, number], awning: number, sign: keyof typeof SHOP_SIGNS): Img {
-  const img = house({ w: 44, roofH: 22, wallH: 24, roof, wall: [C.sand2, C.sand1], windows: 2 });
-  const y = 22 + 9; // awning over the door
-  for (let x = 14; x < 34; x++) {
-    const c = Math.floor((x - 14) / 3) % 2 === 0 ? awning : C.white;
-    vline(img, x, y, y + 3, c);
-    if (x % 3 === 1) img.set(x, y + 4, c);
+// Keepers stand INSIDE these: the game draws them clipped to the opening (KEEPERS in
+// packages/game/src/village/maps.ts holds the same rectangles — change both together).
+
+/** A shop with a counter window: the keeper inside shows from the chest up over the counter,
+ *  shelves of goods behind. 48×48; the opening is x 12–35, y 22–39 (seen below the awning: y 26+). */
+function shop(roof: [number, number], awning: number, sign: keyof typeof SHOP_SIGNS, shelf: "sacks" | "jars", chimney = false): Img {
+  const img = house({ w: 44, roofH: 18, wallH: 28, roof, wall: [C.sand2, C.sand1], door: -1, windows: 0, chimney });
+  const x0 = 12, x1 = 35, top = 22, sill = 40;
+  rect(img, x0 - 1, top - 1, x1 - x0 + 3, sill - top + 1, C.bark1); // frame
+  rect(img, x0, top, x1 - x0 + 1, sill - top, C.deep1); // the room
+  // shelves along the back, goods on them
+  for (const sy of [top + 7, top + 13]) {
+    hline(img, x0, x1, sy, C.bark2);
+    for (let x = x0 + 1; x < x1 - 1; x += 4) {
+      if (shelf === "sacks") {
+        rect(img, x, sy - 3, 3, 3, (x >> 2) % 2 ? C.white : C.sand2);
+        img.set(x + 1, sy - 4, C.sand1);
+      } else {
+        rect(img, x, sy - 3, 2, 3, [C.coral, C.jade3, C.yellow, C.foam1][(x >> 2) % 4]!);
+        img.set(x, sy - 4, C.bark2);
+      }
+    }
   }
-  hline(img, 13, 34, y - 1, C.ink);
-  // hanging sign
-  rect(img, 36, 24, 10, 10, C.wood);
-  rect(img, 37, 25, 8, 8, C.sand2);
-  SHOP_SIGNS[sign](img, 38, 25);
-  vline(img, 41, 22, 23, C.bark1);
+  // the counter, with a scale on it
+  rect(img, x0 - 3, sill, x1 - x0 + 7, 4, C.wood);
+  hline(img, x0 - 3, x1 + 3, sill, C.sand1);
+  hline(img, x0 - 3, x1 + 3, sill + 3, C.bark1);
+  for (let x = x0; x < x1; x += 6) vline(img, x, sill + 1, sill + 2, C.bark2);
+  rect(img, x1 - 4, sill - 2, 4, 2, C.gray2);
+  hline(img, x1 - 5, x1, sill - 3, C.gray1);
+  // the awning over the window
+  for (let x = x0 - 3; x <= x1 + 3; x++) {
+    const c = Math.floor((x - x0 + 3) / 3) % 2 === 0 ? awning : C.white;
+    vline(img, x, top - 1, top + 2, c);
+    if (x % 3 === 1) img.set(x, top + 3, c);
+  }
+  hline(img, x0 - 3, x1 + 3, top - 2, C.ink);
+  // hanging sign on the side wall
+  rect(img, 38, 28, 9, 9, C.wood);
+  rect(img, 39, 29, 7, 7, C.sand2);
+  SHOP_SIGNS[sign](img, 39, 29);
+  vline(img, 42, 26, 27, C.bark1);
+  // small windows beside
+  rect(img, 4, 26, 5, 6, C.wood);
+  rect(img, 5, 27, 3, 4, C.foam1);
   return ol(img);
 }
 
+/** An open-front boat shed: the keeper stands inside the dark bay beside a hull on blocks, tools
+ *  on the back wall. 48×44; the bay is x 8–39, y 18–41 (a whole person fits). */
 function shed(): Img {
-  // open-front boat shed: a dark bay with a hull on blocks, tools on the wall
-  const img = house({ w: 44, roofH: 18, wallH: 24, roof: [C.gray2, C.gray1], wall: [C.wood, C.bark2], door: -1, windows: 0 });
-  rect(img, 9, 24, 30, 19, C.bark1);
-  rect(img, 10, 25, 28, 18, C.navy);
-  ellipse(img, 24, 37, 11, 4, (x, y, nx, ny) => (ny < -0.2 ? C.coral : C.red2)); // hull
-  hline(img, 14, 34, 37, C.white);
-  rect(img, 15, 40, 3, 3, C.wood);
-  rect(img, 30, 40, 3, 3, C.wood);
-  SHOP_SIGNS.wrench(img, 12, 26);
+  const img = house({ w: 44, roofH: 14, wallH: 28, roof: [C.gray2, C.gray1], wall: [C.wood, C.bark2], door: -1, windows: 0 });
+  rect(img, 7, 17, 34, 25, C.bark1);
+  rect(img, 8, 18, 32, 24, C.navy);
+  hline(img, 8, 39, 40, C.deep1); // the floor
+  hline(img, 8, 39, 41, C.deep1);
+  ellipse(img, 18, 35, 9, 3.6, (x, y, nx, ny) => (ny < -0.2 ? C.coral : C.red2)); // hull
+  hline(img, 11, 25, 35, C.white);
+  rect(img, 12, 38, 3, 3, C.wood);
+  rect(img, 22, 38, 3, 3, C.wood);
+  // tools on the back wall
+  SHOP_SIGNS.wrench(img, 10, 19);
+  vline(img, 34, 20, 27, C.wood); // a saw and an oar
+  rect(img, 35, 21, 3, 5, C.gray2);
+  vline(img, 37, 19, 30, C.wood);
+  rect(img, 36, 29, 3, 3, C.wood);
   // planks on the side wall
-  for (let y = 26; y < 42; y += 3) hline(img, 3, 7, y, C.bark2);
+  for (let y = 20; y < 40; y += 3) hline(img, 2, 5, y, C.bark2);
   return ol(img);
 }
 
@@ -816,8 +861,10 @@ export function buildTown(): SheetItem[] {
     { name: "o_pot", img: pot() },
     { name: "o_ball", img: ball() },
     { name: "o_rods", img: rods() },
-    { name: "b_shop", img: shop([C.sea1, C.deep2], C.sea2, "bag") },
-    { name: "b_shop_salt", img: shop([C.gray2, C.gray1], C.sea1, "bag") },
+    { name: "b_shop", img: shop([C.sea1, C.deep2], C.sea2, "bag", "jars") },
+    { name: "b_shop_salt", img: shop([C.gray2, C.gray1], C.sea1, "bag", "sacks") },
+    // 덕배 할멈's house: a shop window on the front (she buys fish, gives worms); "b_house_" = it smokes
+    { name: "b_house_granny", img: shop([C.red2, C.red1], C.red2, "fish", "jars", true) },
     { name: "b_shed", img: shed() },
     { name: "b_stall_fish", img: stall(C.red2, "fish") },
     { name: "b_stall_goods", img: stall(C.sea1, "goods") },

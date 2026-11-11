@@ -5,6 +5,8 @@
 //           r rock · w salt pan · # log raft
 // Services only appear when the island's market offers them (balance.jsonc economy.markets).
 // A stall keeper stands on the stall's own row: drawn behind it, shown between awning and counter.
+// A shop or shed keeper stands INSIDE (`inside`): seen through its opening (KEEPERS).
+// You trade from anywhere along the front of the counter: a spot's `w` tiles, centered on it.
 
 export type Ground = "~" | "." | "," | "s" | ":" | "o" | "=" | "r" | "w" | "#";
 export type Facing = "down" | "up" | "left" | "right";
@@ -12,10 +14,23 @@ export type Service = "market" | "shop" | "fuel" | "repair" | "gift" | "talk" | 
 
 /** A sprite from the town sheet, its bottom-center on tile (x, y). `foot` = solid tiles (w × h) up from there. */
 export type Prop = { sprite: string; x: number; y: number; foot?: [number, number]; anim?: string[]; light?: boolean };
-/** A villager standing (or walking a loop of tiles). `look` = p_<look>_<dir>_<frame>. */
-export type Npc = { id: string; look: string; name: string; x: number; y: number; dir: Facing; walk?: [number, number][] };
-/** Where the player stands to do something, and what it is. */
-export type Poi = { id: string; x: number; y: number; services: Service[]; who: string; npc?: string; lines?: string[] };
+/** A villager standing (or walking a loop of tiles). `look` = p_<look>_<dir>_<frame>.
+ *  `inside`: a keeper in the building on that tile, standing where KEEPERS says. */
+export type Npc = { id: string; look: string; name: string; x: number; y: number; dir: Facing; walk?: [number, number][]; inside?: boolean };
+/** Where the player stands to do something, and what it is. `w` = how many tiles wide (odd,
+ *  centered on x): the whole front of a counter. */
+export type Poi = { id: string; x: number; y: number; w?: number; services: Service[]; who: string; npc?: string; lines?: string[] };
+
+/** Buildings a keeper stands inside (sprite px from the top-left): the opening they're seen
+ *  through, and where their feet are. Must match packages/sprites/src/sprites/town.ts. */
+export const KEEPERS: Record<string, { clip: [number, number, number, number]; feet: [number, number] }> = {
+  // a counter window under an awning: the keeper shows from the chest up
+  b_shop: { clip: [12, 26, 24, 14], feet: [24, 47] },
+  b_shop_salt: { clip: [12, 26, 24, 14], feet: [24, 47] },
+  b_house_granny: { clip: [12, 26, 24, 14], feet: [24, 47] },
+  // the open bay of a boat shed: a whole person beside the hull
+  b_shed: { clip: [8, 18, 32, 24], feet: [31, 41] },
+};
 
 export type VillageDef = {
   id: string;
@@ -105,7 +120,7 @@ function redLighthouse(): VillageDef {
     spawn: [20, 22],
     props: [
       { sprite: "b_lighthouse", x: 10, y: 7, foot: [2, 2] },
-      { sprite: "b_house_red", x: 16, y: 10, foot: [3, 2] },
+      { sprite: "b_house_granny", x: 16, y: 10, foot: [3, 2] },
       { sprite: "b_grandpa", x: 24, y: 10, foot: [3, 2] },
       { sprite: "b_shed", x: 29, y: 16, foot: [3, 2] },
       { sprite: "b_board", x: 15, y: 15, foot: [1, 1] },
@@ -137,13 +152,13 @@ function redLighthouse(): VillageDef {
     perches: [[6, 9], [34, 15], [33, 7]],
     gulls: 3,
     npcs: [
-      { id: "granny", look: "granny", name: "덕배 할멈", x: 18, y: 11, dir: "down" },
-      { id: "fixer", look: "fisher", name: "동네 아저씨", x: 30, y: 18, dir: "left" },
-      { id: "walker", look: "woman", name: "마을 사람", x: 13, y: 13, dir: "right", walk: [[13, 13], [19, 13], [19, 18], [19, 13]] },
+      { id: "granny", look: "granny", name: "덕배 할멈", x: 16, y: 10, dir: "down", inside: true },
+      { id: "fixer", look: "fisher", name: "갑수 아저씨", x: 29, y: 16, dir: "down", inside: true },
+      { id: "walker", look: "woman", name: "순임 아주머니", x: 13, y: 13, dir: "right", walk: [[13, 13], [19, 13], [19, 18], [19, 13]] },
     ],
     pois: [
-      { id: "granny", x: 18, y: 12, services: ["market", "gift"], who: "덕배 할멈", npc: "granny" },
-      { id: "repair", x: 29, y: 18, services: ["repair"], who: "동네 아저씨 · 배 수리", npc: "fixer" },
+      { id: "granny", x: 16, y: 11, w: 3, services: ["market", "gift"], who: "덕배 할멈", npc: "granny" },
+      { id: "repair", x: 29, y: 17, w: 3, services: ["repair"], who: "갑수 아저씨 · 배 수리", npc: "fixer" },
       { id: "grandpa", x: 24, y: 11, services: ["talk"], who: "할아버지의 집", lines: ["할아버지가 살던 집이다. 문이 잠겨 있다.", "언젠가 열쇠를 찾으면 들어갈 수 있을 것 같다."] },
       { id: "board", x: 15, y: 16, services: ["talk"], who: "게시판", lines: ["「물고기 값은 섬마다, 날마다 달라요」", "「물장터는 동쪽, 소금꽃섬은 남동쪽 바다」"] },
       { id: "lighthouse", x: 10, y: 8, services: ["talk"], who: "빨간 등대", lines: ["할아버지가 지키던 등대. 밤마다 아직 불이 켜진다."] },
@@ -203,14 +218,14 @@ function waterMarket(): VillageDef {
     gulls: 4,
     npcs: [
       { id: "malsun", look: "malsun", name: "말순", x: 16, y: 8, dir: "down" },
-      { id: "goods", look: "woman", name: "잡화 좌판", x: 24, y: 8, dir: "down" },
-      { id: "fixer", look: "fisher", name: "배 고치는 아저씨", x: 8, y: 12, dir: "left" },
-      { id: "walker", look: "man", name: "장꾼", x: 15, y: 10, dir: "right", walk: [[15, 10], [25, 10]] },
+      { id: "goods", look: "woman", name: "옥분 아주머니", x: 24, y: 8, dir: "down" },
+      { id: "fixer", look: "fisher", name: "칠복 아저씨", x: 6, y: 11, dir: "down", inside: true },
+      { id: "walker", look: "man", name: "짐꾼 덕수", x: 15, y: 10, dir: "right", walk: [[15, 10], [25, 10]] },
     ],
     pois: [
-      { id: "market", x: 16, y: 9, services: ["market"], who: "말순 · 생선 좌판", npc: "malsun" },
-      { id: "shop", x: 24, y: 9, services: ["shop"], who: "잡화 좌판", npc: "goods" },
-      { id: "repair", x: 6, y: 12, services: ["repair"], who: "배 고치는 아저씨", npc: "fixer" },
+      { id: "market", x: 16, y: 9, w: 3, services: ["market"], who: "말순 · 생선 좌판", npc: "malsun" },
+      { id: "shop", x: 24, y: 9, w: 3, services: ["shop"], who: "옥분 아주머니 · 잡화 좌판", npc: "goods" },
+      { id: "repair", x: 6, y: 12, w: 3, services: ["repair"], who: "칠복 아저씨 · 배 수리", npc: "fixer" },
       { id: "fuel", x: 34, y: 9, services: ["fuel"], who: "주유기" },
       { id: "board", x: 14, y: 7, services: ["talk"], who: "장터 게시판", lines: ["「오늘의 특가는 좌판 앞에 적어 둡니다」", "「한 가지만 잔뜩 가져오면 값이 내려가요」"] },
       { id: "pier", x: 20, y: 24, services: ["leave"], who: "선착장" },
@@ -271,14 +286,15 @@ function saltFlower(): VillageDef {
     gulls: 3,
     npcs: [
       { id: "oldman", look: "oldman", name: "강노인", x: 26, y: 10, dir: "down" },
-      { id: "fixer", look: "man", name: "수리공", x: 34, y: 17, dir: "left" },
-      { id: "walker", look: "woman", name: "소금 일꾼", x: 9, y: 12, dir: "right", walk: [[9, 12], [17, 12], [17, 11], [9, 11]] },
+      { id: "salt", look: "woman", name: "정순 아주머니", x: 14, y: 14, dir: "down", inside: true },
+      { id: "fixer", look: "man", name: "만석 아저씨", x: 32, y: 17, dir: "down", inside: true },
+      { id: "walker", look: "fisher", name: "염부 길남", x: 9, y: 12, dir: "right", walk: [[9, 12], [17, 12], [17, 11], [9, 11]] },
     ],
     pois: [
-      { id: "market", x: 26, y: 11, services: ["market"], who: "강노인 · 생선 매입", npc: "oldman" },
-      { id: "shop", x: 14, y: 15, services: ["shop"], who: "소금 가게" },
+      { id: "market", x: 26, y: 11, w: 3, services: ["market"], who: "강노인 · 생선 매입", npc: "oldman" },
+      { id: "shop", x: 14, y: 15, w: 3, services: ["shop"], who: "정순 아주머니 · 소금 가게", npc: "salt" },
       { id: "store", x: 24, y: 7, services: ["talk"], who: "소금 창고", lines: ["강노인의 소금 창고. 올해 소금이 잘 말랐다.", "「소금에 절이면 신선도가 거기서 멈춘다」"] },
-      { id: "repair", x: 32, y: 18, services: ["repair"], who: "수리공", npc: "fixer" },
+      { id: "repair", x: 32, y: 18, w: 3, services: ["repair"], who: "만석 아저씨 · 배 수리", npc: "fixer" },
       { id: "fuel", x: 24, y: 21, services: ["fuel"], who: "주유기" },
       { id: "board", x: 18, y: 17, services: ["talk"], who: "게시판", lines: ["「소금에 절인 생선은 이 섬에서 제값」", "「얼음 창고는 소금 가게에서」"] },
       { id: "pier", x: 21, y: 24, services: ["leave"], who: "선착장" },
@@ -332,15 +348,15 @@ function bellTower(): VillageDef {
     perches: [[6, 14], [34, 14], [25, 5], [14, 19]],
     gulls: 4,
     npcs: [
-      { id: "bada", look: "kid", name: "아이 바다", x: 9, y: 11, dir: "down" },
-      { id: "kid2", look: "kid", name: "좌판 아이", x: 31, y: 11, dir: "down" },
-      { id: "fixer", look: "man", name: "목수 아저씨", x: 18, y: 18, dir: "left" },
-      { id: "walker", look: "kid", name: "뛰노는 아이", x: 19, y: 16, dir: "right", walk: [[19, 16], [22, 16]] },
+      { id: "bada", look: "kid", name: "바다", x: 9, y: 11, dir: "down" },
+      { id: "kid2", look: "kid", name: "별이", x: 31, y: 11, dir: "down" },
+      { id: "fixer", look: "man", name: "용팔 아저씨", x: 16, y: 17, dir: "down", inside: true },
+      { id: "walker", look: "kid", name: "솔이", x: 19, y: 16, dir: "right", walk: [[19, 16], [22, 16]] },
     ],
     pois: [
-      { id: "market", x: 9, y: 12, services: ["market"], who: "아이 바다 · 생선 좌판", npc: "bada" },
-      { id: "shop", x: 31, y: 12, services: ["shop"], who: "아이들의 좌판", npc: "kid2" },
-      { id: "repair", x: 16, y: 18, services: ["repair"], who: "목수 아저씨", npc: "fixer" },
+      { id: "market", x: 9, y: 12, w: 3, services: ["market"], who: "바다 · 생선 좌판", npc: "bada" },
+      { id: "shop", x: 31, y: 12, w: 3, services: ["shop"], who: "별이 · 아이들의 좌판", npc: "kid2" },
+      { id: "repair", x: 16, y: 18, w: 3, services: ["repair"], who: "용팔 아저씨 · 배 수리", npc: "fixer" },
       { id: "tower", x: 20, y: 10, services: ["talk"], who: "종탑", lines: ["물에 잠긴 학교의 종탑. 오래된 교과서 냄새가 난다.", "아이들이 이 종을 쳐서 시간을 알린다."] },
       { id: "board", x: 23, y: 17, services: ["talk"], who: "게시판", lines: ["「선체 Lv2는 이 섬에서 팔아요 — 청빛 바다로 가려면 꼭!」"] },
       { id: "pier", x: 20, y: 24, services: ["leave"], who: "선착장" },
