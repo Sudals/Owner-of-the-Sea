@@ -7,6 +7,9 @@ export { Assets, ATLASES, BACKGROUNDS, islandBg, lutHex, type AtlasName, type Bg
 export type { CastRecord, CastResult, DexEntry, FishingSession, GameBackend, Gear, HoldItem, Inventory, Profile, SaveOutcome, SaveReason, SaveStatus, SessionSpot, WorldState } from "./backend";
 export { Game, type BuildMode } from "./game";
 export { Settings, type SettingsData } from "./settings";
+export { AudioOut, type MusicCue } from "./audio/audio";
+export { SONGS } from "./audio/songs";
+export type { SongId } from "./audio/score";
 export { TitleScene, type TitleState } from "./scenes/title";
 export { Engine, VIEW_H, VIEW_W, type Scene } from "./engine";
 export { Input } from "./input";
@@ -38,6 +41,8 @@ export async function createGame(host: HTMLElement, opts: GameOptions): Promise<
   const engine = new Engine(host, { assets, dev: opts.dev });
   const game = new Game(engine, opts.backend, opts.mode ?? "full", opts.quit ?? null, opts.version ?? "");
   engine.setScaleMode(game.settings.data.display);
+  engine.onFrame = () => game.updateAudio();
+  engine.onDestroy = () => game.audio.destroy();
   game.toTitle();
   engine.start();
   return { engine, game };

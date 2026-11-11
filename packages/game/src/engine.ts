@@ -1,4 +1,5 @@
 import type { Assets } from "./assets";
+import type { MusicCue } from "./audio/audio";
 import { Input } from "./input";
 import type { Modal } from "./ui/modal";
 
@@ -24,6 +25,8 @@ export interface Scene {
   update(dt: number, engine: Engine): void;
   render(ctx: CanvasRenderingContext2D, engine: Engine): void;
   exit?(engine: Engine): void;
+  /** The song that fits this scene right now (asked every frame; null = quiet). */
+  music?(): MusicCue | null;
 }
 
 export type EngineOptions = { assets: Assets; dev?: boolean };
@@ -49,6 +52,10 @@ export class Engine {
   readonly assets: Assets;
   readonly dev: boolean;
 
+  /** Called after every frame (the game hooks its music here). */
+  onFrame: (() => void) | null = null;
+  /** Called when the engine is torn down. */
+  onDestroy: (() => void) | null = null;
   /** A dialog over the scene; while set, the scene doesn't step (ui/modal.ts). */
   modal: Modal | null = null;
   /** Seconds of simulated time since start. */
@@ -160,6 +167,7 @@ export class Engine {
     this.scene?.exit?.(this);
     this.resizeObs.disconnect();
     this.input.destroy();
+    this.onDestroy?.();
     this.screen.remove();
   }
 
@@ -196,6 +204,7 @@ export class Engine {
       this.ctx.restore();
     }
     this.present();
+    this.onFrame?.();
   }
 
   private present(): void {

@@ -11,9 +11,11 @@ All sprites, tiles, backgrounds, UI and the app icon are original, generated fro
   https://github.com/quiple/galmuri · npm `galmuri`
   The font is bundled with the game; its license file ships alongside it.
 
-## Sound
+## Music & sound
 
-All sound effects are synthesized at runtime with the Web Audio API (no audio files).
+The music — five songs: 로비, 섬, 바다, 마을, 폭풍 — was written for this game and is synthesized
+at runtime with the Web Audio API (`packages/game/src/audio`). There are no audio files and no
+third-party music. Sound effects will be made the same way.
 
 ---
 

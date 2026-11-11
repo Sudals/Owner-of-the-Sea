@@ -1,3 +1,4 @@
+import type { MusicCue } from "../audio/audio";
 import { devShiftDays, fuelMax, holdCap, HULLS, ISLAND_BY_ID, ITEMS, kstDate, type ItemId, type Market } from "@sea/shared";
 import { lutHex } from "../assets";
 import { followCam, VIEW_H, VIEW_W, type Engine, type Scene } from "../engine";
@@ -132,6 +133,10 @@ export class VillageScene implements Scene {
       default:
         return true;
     }
+  }
+
+  music(): MusicCue {
+    return { song: "village" };
   }
 
   enter(engine: Engine): void {

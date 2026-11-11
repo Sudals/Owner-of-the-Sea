@@ -28,6 +28,9 @@ const CSP = [
 
 protocol.registerSchemesAsPrivileged([{ scheme: "app", privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, stream: true } }]);
 
+// a game may play its music from the lobby on (a browser waits for the first key or click)
+app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
+
 // tests point userData somewhere disposable
 if (process.env.SEA_USER_DATA) app.setPath("userData", process.env.SEA_USER_DATA);
 

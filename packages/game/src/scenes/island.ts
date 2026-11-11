@@ -1,3 +1,4 @@
+import type { MusicCue } from "../audio/audio";
 import { devShiftDays, fuelMax, holdCap, HULLS, ISLAND_BY_ID, ITEMS, kstDate, marketOf, SEA_NAME, type ItemId } from "@sea/shared";
 import { islandBg, lutHex } from "../assets";
 import type { Engine, Scene } from "../engine";
@@ -93,6 +94,10 @@ export class IslandScene implements Scene {
     const i = this.menu().findIndex((m) => m.id === id && !m.disabled);
     if (i >= 0) this.sel = i;
     return i >= 0;
+  }
+
+  music(): MusicCue {
+    return { song: "island" };
   }
 
   enter(engine: Engine): void {

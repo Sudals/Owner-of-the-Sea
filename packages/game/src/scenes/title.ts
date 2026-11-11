@@ -1,3 +1,4 @@
+import type { MusicCue } from "../audio/audio";
 import { NAME_MAX, NAME_RE, normalizeRecoveryCode, RECOVERY_RE } from "@sea/shared";
 import type { LutName } from "@sea/sprites/palette";
 import { lutHex } from "../assets";
@@ -57,6 +58,10 @@ export class TitleScene implements Scene {
 
   get profile(): Profile | null {
     return this.game.backend.profile();
+  }
+
+  music(): MusicCue {
+    return { song: "title" };
   }
 
   enter(engine: Engine): void {

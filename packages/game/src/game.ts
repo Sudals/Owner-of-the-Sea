@@ -1,8 +1,10 @@
 import { BARE_HOOK, dockFacing, ISLAND_BY_ID, ITEMS, START_ISLAND, TILE, type ItemId } from "@sea/shared";
 import type { Assets } from "./assets";
 import { lutHex } from "./assets";
+import { AudioOut } from "./audio/audio";
 import type { GameBackend, SaveOutcome, SaveReason, WorldState } from "./backend";
 import type { Engine } from "./engine";
+import { isNight } from "./render/tint";
 import { panel, text, textWidth } from "./render/ui";
 import { FishingScene, type Spot } from "./scenes/fishing";
 import { IslandScene, type ArrivalNote } from "./scenes/island";
@@ -24,6 +26,8 @@ const NAG_AFTER_MS = 30 * 60_000;
  *  and the scene changes between 로비 → 섬 ⇄ 바다 → 낚시 (design §7-3). */
 export class Game {
   readonly settings = new Settings();
+  /** The music (and, later, the sound effects): each scene names its song (Scene.music). */
+  readonly audio = new AudioOut(this.settings);
   /** One clock for every scene, so time keeps running across the island, the sea and fishing. */
   readonly clock = new Clock(9);
   private worldState: WorldState | null = null;
@@ -236,6 +240,12 @@ export class Game {
     const blink = l.nag && Math.floor(performance.now() / 500) % 2 === 0;
     if (l.nag) assets.draw(ctx, "ui", "icon_save", align === "left" ? x : x - textWidth(ctx, l.text) - 18, y - 3);
     text(ctx, l.text, l.nag && align === "left" ? x + 18 : x, y, { align, color: blink ? lutHex("yellow") : lutHex("foam2") });
+  }
+
+  /** Every frame (Engine.onFrame): the current scene's song; nights are softer, except in the lobby. */
+  updateAudio(): void {
+    const cue = this.engine.currentScene?.music?.() ?? null;
+    this.audio.update(cue, cue !== null && cue.song !== "title" && isNight(this.clock));
   }
 
   // ── scenes ──

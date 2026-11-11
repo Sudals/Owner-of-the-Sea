@@ -1,3 +1,4 @@
+import type { MusicCue } from "../audio/audio";
 import { balance, BARE_HOOK, FISH_BY_ID, GRADE_LABEL, holdCap, ITEMS, omenCastIndex, POINT_BY_ID, rollCast, START_ISLAND, withBalance, type CastRoll, type FishData, type FishingPoint, type ItemId } from "@sea/shared";
 import type { LutName } from "@sea/sprites/palette";
 import { islandBg, lutHex, type BgName } from "../assets";
@@ -128,6 +129,11 @@ export class FishingScene implements Scene {
     this.session = null;
     if (this.spot.kind === "boat") this.game.toSea();
     else this.game.toIsland(this.spot.islandId ?? START_ISLAND.id);
+  }
+
+  music(): MusicCue {
+    const k = this.state.k;
+    return { song: this.spot.kind === "dock" ? "island" : "sea", tension: k === "reeling" ? 1 : k === "bite" ? 0.5 : 0 };
   }
 
   enter(engine: Engine): void {

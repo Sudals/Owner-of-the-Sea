@@ -1,3 +1,4 @@
+import type { MusicCue } from "../audio/audio";
 import {
   DOCK_RADIUS, dockNear, FUEL, freshnessPct, fuelMax, holdCap, HULLS, IMPACT, impactDamage, isOpen, ISLANDS, Kind, stormDamagePerSec, towLossRate, MAP_H, MAP_W, mapPoints, nearestIsland, pointNear, POINT_BY_ID, POINT_RADIUS,
   seaBlock, seaGrid, SEA_NAME, stormIntensity, stormsAt, TILE, tileAt, type Island, type MapPoint,
@@ -49,6 +50,8 @@ export class SeaScene implements Scene {
   bag: InventoryPanel | null = null;
   pause: { sel: number } | null = null;
   storm = 0;
+  /** The storm song plays from a real storm (> 0.45) until it has nearly passed (< 0.2). */
+  private stormMusic = false;
 
   private view: SeaView | null = null;
   private explored: Explored;
@@ -77,6 +80,10 @@ export class SeaScene implements Scene {
     const at = game.world.at;
     if (at.kind === "sea") this.boat = { x: at.x, y: at.y, vx: 0, vy: 0, heading: at.heading, speed: 0 };
     this.explored = new Explored(game.world.chart);
+  }
+
+  music(): MusicCue {
+    return { song: this.stormMusic ? "storm" : "sea" };
   }
 
   enter(engine: Engine): void {
@@ -180,6 +187,8 @@ export class SeaScene implements Scene {
     // ── where are we, what's near ──
     const tile = tileAt(Math.floor(this.boat.x / TILE), Math.floor(this.boat.y / TILE));
     this.storm = stormIntensity(this.boat.x / TILE, this.boat.y / TILE, this.game.clockH);
+    if (this.storm > 0.45) this.stormMusic = true;
+    else if (this.storm < 0.2) this.stormMusic = false;
     const dock = dockNear(this.boat.x, this.boat.y);
     const point = dock ? null : pointNear(this.boat.x, this.boat.y);
     this.prompt = dock ? { kind: "dock", island: dock } : point ? { kind: "fish", point } : null;
